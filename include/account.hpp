@@ -1,5 +1,5 @@
 #include "structures.hpp"
-
+#include <map>
 //requires structures.hpp for the position struct
 
 //
@@ -18,16 +18,23 @@ class Account{
         double checkBalance();
         void modifyBalance(double modifier);
 
-        void addNewPosition(Position newPos);
-        void addPositionQuantity(Position targetPos, long quantityChange, double entryPrice);
-        void subtractPositionQuantity(Position targetPos, long quantityChange, double entryPrice);
-        void removePosition(Position targetPos);
+        void buyNewPosition(std::string ticker, long quantity, double entryPrice);
+        void buyPositionQuantity(std::string ticker, long quantityChange, double entryPrice);
+        void sellPositionQuantity(std::string ticker, long quantityChange, double entryPrice);
+        void sellAllPosition(std::string ticker, double currentPrice);
 
-        double positionAEP(Position targetPos); //AEP => Average Entry Price
-        long positionQuantity(Position targetPos); 
+        double positionAEP(std::string ticker); //AEP => Average Entry Price
+        long positionQuantity(std::string ticker);
+        double positionValue(std::string ticker, double currPrice);
+        //double checkTotalEquity();
+        
 
     private:
         double balance = 10000.0;
+        //map of all the positions in the account
+        //positions.first => ticker, positions.second=> Position struct
+        std::map<std::string, Position> positions;
+        int numPositions;
+
         
-        
-}
+};

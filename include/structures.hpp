@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 
 //data considerations(keep in csv parser)

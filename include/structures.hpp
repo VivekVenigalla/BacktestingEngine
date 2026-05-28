@@ -6,7 +6,7 @@
 //struct for a ohcl data plot
 //contains the date, open and close price, highest and lowest price in the period of measurement, and volume
 struct Bar{
-    string date;
+    std::string date;
     double open;
     double close;
     double high;
@@ -17,8 +17,8 @@ struct Bar{
 //struct for a order
 //contains the information on the ticker and the type of order
 struct Order{
-    string ticker;
-    string type;
+    std::string ticker;
+    std::string type;
     //buy(0) sell(1)
     bool side;
     long quantity;
@@ -29,7 +29,7 @@ struct Order{
 //current value of a pertaining ticker
 //can iterate into a std::vector for a portfolio
 struct Position{
-    string ticker;
+    std::string ticker;
     long quantity;
     double average_entry_price;
 //add more if needed

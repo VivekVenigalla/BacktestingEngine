@@ -19,12 +19,15 @@ struct Bar{
 //contains the information on the ticker and the type of order
 struct Order{
     std::string ticker;
+    //types of orders:
+    //1. market
+    //2. limit
     std::string type;
     //buy(0) sell(1)
     bool side;
     long quantity;
-    //assuming there is a limit order
-    double limit_price;
+    //assuming there is a limit or stop order
+    double check_price;
 };
 
 //current value of a pertaining ticker
@@ -40,8 +43,17 @@ struct Position{
 //this struct will be to keep a history off all trades in history
 //assume that each trade will pertain to an order by its index, as they are all fulfilled in succession
 //consider time slippage
+
+//the id of a trade is the same as a order
+//trades are essentially the same as a order but they include the exec_price to account for slippage and also the commision as well
+//these trades are logged on the backtester user's choice to evaluate the strength of the strategy
 struct Trade{
+    std::string ticker;
     double exec_price;
+    std::string type;
+    bool side;
+    long quantity;
+    double check_price;
     //figure out the commmision calculation
     double commision;
 };

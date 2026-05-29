@@ -1,6 +1,9 @@
 import yfinance as yf
 import pandas as pd
 
+#Activating virtual environment
+#source yf_env/bin/activate
+
 #Path to where to upload the data
 PATH_TO_DOWNLOAD = "../data"
 #add more tickers if needed to upload data

@@ -20,6 +20,7 @@ Account::Account(double initBalance, bool initPos){
         std::cout << "Exception raised: " << e << "\n";
     }
     for(int i = 0; i < numPositions; i++){
+        //will implement at a later point
         std::cout << "Here";
     }
 }

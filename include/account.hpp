@@ -1,5 +1,6 @@
+#pragma once
 #include "structures.hpp"
-#include <map>
+#include <unordered_map>
 //requires structures.hpp for the position struct
 
 //
@@ -33,7 +34,7 @@ class Account{
         double balance = 10000.0;
         //map of all the positions in the account
         //positions.first => ticker, positions.second=> Position struct
-        std::map<std::string, Position> positions;
+        std::unordered_map<std::string, Position> positions;
         int numPositions;
 
         

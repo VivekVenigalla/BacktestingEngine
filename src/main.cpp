@@ -2,10 +2,11 @@
 #include <string>
 #include "../include/csvParser.hpp"
 #include "../include/account.hpp"
-
+#include "../include/broker.hpp"
 
 int main(){
     Parser test;
+    //we do not create a reference to the data since in the csvParser, the data is alreday temporary since it is a local var
     std::map<std::string, Bar> newData = test.parse();
     std::cout<<newData["2015-01-13 00:00:00-05:00"].open<<" test\n";
     Account newAccount(1200.0);

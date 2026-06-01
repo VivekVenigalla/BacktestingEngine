@@ -27,6 +27,7 @@ class Account{
         double positionAEP(std::string ticker); //AEP => Average Entry Price
         long positionQuantity(std::string ticker);
         double positionValue(std::string ticker, double currPrice);
+        bool checkPosition(std::string ticker);
         //double checkTotalEquity();
         
 

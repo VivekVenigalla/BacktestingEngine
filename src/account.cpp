@@ -64,7 +64,7 @@ void Account::sellAllPosition(std::string ticker, double currentPrice){
     
 }
 
-//average entry price and quantity of a position
+//average entry price and quantity of a position and presence of position
 double Account::positionAEP(std::string ticker){
     return positions[ticker].average_entry_price;
 }
@@ -76,6 +76,10 @@ long Account::positionQuantity(std::string ticker){
 double Account::positionValue(std::string ticker, double currPrice){
     return positions[ticker].quantity*currPrice;
 }
+
+bool Account::checkPosition(std::string ticker){
+    return positions.contains(ticker);
+} 
 
 //this function will be implemented at a later point
 //total equity = cash value + value of all positions

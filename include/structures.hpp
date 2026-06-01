@@ -50,7 +50,7 @@ struct Position{
 //these trades are logged on the backtester user's choice to evaluate the strength of the strategy
 struct Trade{
     std::string ticker;
-    double exec_price;
+    double execPrice;
     std::string type;
     bool side;
     long quantity;
@@ -58,4 +58,5 @@ struct Trade{
     //figure out the commmision calculation
     double commision;
     std::string status;
+    double currBalance;
 };

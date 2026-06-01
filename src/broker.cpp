@@ -21,18 +21,26 @@ int Broker::createOrder(Order newOrder){
     if(checkOrder(newOrder)){
         if(newOrder.type == "market"){
             processOrder(tempID, newOrder);
-            ++tempID;
-            return tempID-1;
         }
         else{
             orders[tempID] = newOrder;
-            ++tempID;
-            return tempID-1;
         }
     }
+    //null order if no availabel funds or shares
     else{
-        return 0;
+        Trade tempTrade;
+        tempTrade.ticker = order.ticker;
+        tempTrade.execPrice;
+        tempTrade.type = order.type;
+        tempTrade.side = order.quantity;
+        tempTrade.quantity = order.quantity;
+        tempTrade.checkPrice = order.checkPrice;
+        
+        tempTrade.status = "ORDER " + std::to_string(tempID) + " FAILED TO FILL: LACK OF FUNDS OR SHARES";
+        history[tempID] = tempTrade;
     }
+    ++tempID;
+    return tempID-1;
     
 }
 
@@ -45,11 +53,30 @@ bool Broker::checkOrder(Order& check){
     //buy
     if(check.side == 0){
         double tempBalance = user.checkBalance();
+        double currPrice;
         //obtain the price(low) and tempBalance >= price*quantity
-        return true;
+        if(check.type == "market"){
+            currPrice = currBar.open;
+            tempTrade.execPrice = currBar.open;
+        }
+        else if(check.type == "limit"){
+            currPrice = check.execPrice;
+            tempTrade.execPrice = check.execPrice;
+        }
+        else{
+            currPrice = currBar.close;
+            tempTrade.execPrice = currBar.close;
+        }
+        if(tempBalance >= currPrice*check.quantity){
+            return true;
+        }
+        else{
+            return false;
+        }
         //remove return once function built
         
     }
+    //sell
     else{
         long tempShares = user.positionQuantity(check.ticker);
         if(check.quantity >= tempShares){
@@ -58,6 +85,7 @@ bool Broker::checkOrder(Order& check){
         else{
             return true;
         }
+
     }
 }
 
@@ -65,13 +93,26 @@ void Broker::checkLoop(){
     //.begin and .end provide the iterators for the loop so we can iterate through the unordered_map
     for(auto it = orders.begin();it!=orders.end();){
         //since it is a iterator, in order to obtain the id, we use it->first
-        if(checkOrderLimitAndStop(it->first)){
+        if(checkOrderLimitAndStop(it->second)){
             if(checkOrder(it->second)){
                 //.erase returns a empty iterator temporarily so we prevent index invalidation
-                std::cout<<"Order(ID) " << it->first << " is now valid for processing. Processing...";
                 processOrder(it->first, it->second);
-                std::cout<<"Order(ID) " << it->first << "processed!";
                 it = orders.erase(it);   
+            }
+            //passed required price but lack of funds or shares so order is nulled
+            else{
+                Order order = it->second;
+                Trade tempTrade;
+                tempTrade.ticker = order.ticker;
+                tempTrade.execPrice;
+                tempTrade.type = order.type;
+                tempTrade.side = order.quantity;
+                tempTrade.quantity = order.quantity;
+                tempTrade.checkPrice = order.checkPrice;
+                
+                tempTrade.status = "ORDER " + std::to_string(it->first) + " FAILED TO FILL: LACK OF FUNDS OR SHARES";
+                std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
+                history[it->first] = tempTrade;
             }
         }
         else{
@@ -91,21 +132,126 @@ bool Broker::checkOrderLimitAndStop(Order check){
     //  limit: buy only if Bar's low is smaller than check_price and sell if Bar's high is larger than check_price
     //  stop : vice versa
     //then check if either the account has sufficient funds or if they have enough shares 
-    return true;
+    if(check.type == "limit"){
+        if(check.side == 0){
+            if(currBar.low <= check.checkPrice){
+                return true;
+            }else{
+                return false;
+            }
+        }
+        else{
+            if(currBar.high >= check.checkPrice){
+                return true;
+            }else{
+                return false;
+            }
+        }
+    }
+    else{
+        if(check.side == 1){
+            if(currBar.low <= check.checkPrice){
+                return true;
+            }else{
+                return false;
+            }
+        }
+        else{
+            if(currBar.high >= check.checkPrice){
+                return true;
+            }else{
+                return false;
+            }
+        }
+    }
 }
 
 void Broker::processOrder(int id, Order order){
     //also needs currPrice
     //creates the trade history struct and insters it into the history var
     double currPrice;
-    
     Trade tempTrade;
+
+    //assign currPrice with either high or low depending on the order side and type
+
+    //This implementation for the execPrice is shortsighted as we are using only 1 day intervals. change in the future
+    if(order.type == "market"){
+        currPrice = currBar.open;
+        tempTrade.execPrice = currBar.open;
+    }
+    else if(order.type == "limit"){
+        currPrice = order.execPrice;
+        tempTrade.execPrice = order.execPrice;
+    }
+    else{
+        currPrice = currBar.close;
+        tempTrade.execPrice = currBar.close;
+    }
+
+    //create trade histroy record
     tempTrade.ticker = order.ticker;
     tempTrade.execPrice = currPrice;
     tempTrade.type = order.type;
     tempTrade.side = order.quantity;
     tempTrade.quantity = order.quantity;
     tempTrade.checkPrice = order.checkPrice;
+    
+    //check if position exists on user account or not and fill out order
+    if(user.checkPosition(order.ticker)){
+        if(order.side == 0){
+            tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: BUY " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
+            
+            user.buyPositionQuantity(order.ticker, order.quantity, currPrice);
+            
+            tempTrade.currBalance = user.checkBalance();
+            std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
+            std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
+        }
+        else{
+            if(user.checkPositionQuantity(order.ticker) == order.quantity){
+                //sell all
+                tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " ALL FOR " + " " + std::to_string(currPrice);
+                
+                user.sellAllPosition(order.ticker, currPrice);
+                
+                tempTrade.currBalance = user.checkBalance();
+                std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
+                std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
+                
+            }
+            else if(user.checkPositionQuantity(order.ticker) > order.quantity){
+                tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
+                
+                user.sellPositionQuantity(order.ticker, order.quantity, currPrice);
+                
+                tempTrade.currBalance = user.checkBalance();
+                std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
+                std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
+            }
+            //should not occur due to logic but just in case
+            else{
+                return;
+            }
+        }
+    }
+    //if position does not exist(create new position or output error if selling)
+    else{
+        if(order.side == 1){
+            tempTrade.status = "ORDER " + std::to_string(it->first) + " FAILED TO FILL: ATTEMPT TO SELL POSITION THAT DOES NOT EXIST";
+            std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
+        }
+        else{
+            tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: BUY " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
+            
+            user.buyNewPosition(order.ticker, order.quantity, currPrice);
+            
+            tempTrade.currBalance = user.checkBalance();
+            std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
+            std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
+            
+        }
+    }
+
 
     history[id] = tempTrade;
     

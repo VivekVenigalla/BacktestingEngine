@@ -28,7 +28,7 @@ struct Order{
     bool side;
     long quantity;
     //assuming there is a limit or stop order
-    double check_price;
+    double checkPrice;
 };
 
 //current value of a pertaining ticker

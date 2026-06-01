@@ -29,12 +29,12 @@ int Broker::createOrder(Order newOrder){
     //null order if no availabel funds or shares
     else{
         Trade tempTrade;
-        tempTrade.ticker = order.ticker;
+        tempTrade.ticker = newOrder.ticker;
         tempTrade.execPrice;
-        tempTrade.type = order.type;
-        tempTrade.side = order.quantity;
-        tempTrade.quantity = order.quantity;
-        tempTrade.checkPrice = order.checkPrice;
+        tempTrade.type = newOrder.type;
+        tempTrade.side = newOrder.quantity;
+        tempTrade.quantity = newOrder.quantity;
+        tempTrade.checkPrice = newOrder.checkPrice;
         
         tempTrade.status = "ORDER " + std::to_string(tempID) + " FAILED TO FILL: LACK OF FUNDS OR SHARES";
         history[tempID] = tempTrade;
@@ -57,15 +57,15 @@ bool Broker::checkOrder(Order& check){
         //obtain the price(low) and tempBalance >= price*quantity
         if(check.type == "market"){
             currPrice = currBar.open;
-            tempTrade.execPrice = currBar.open;
+            
         }
         else if(check.type == "limit"){
-            currPrice = check.execPrice;
-            tempTrade.execPrice = check.execPrice;
+            currPrice = check.checkPrice;
+            
         }
         else{
             currPrice = currBar.close;
-            tempTrade.execPrice = currBar.close;
+        
         }
         if(tempBalance >= currPrice*check.quantity){
             return true;
@@ -101,6 +101,7 @@ void Broker::checkLoop(){
             }
             //passed required price but lack of funds or shares so order is nulled
             else{
+                int id = it->first;
                 Order order = it->second;
                 Trade tempTrade;
                 tempTrade.ticker = order.ticker;
@@ -110,9 +111,10 @@ void Broker::checkLoop(){
                 tempTrade.quantity = order.quantity;
                 tempTrade.checkPrice = order.checkPrice;
                 
-                tempTrade.status = "ORDER " + std::to_string(it->first) + " FAILED TO FILL: LACK OF FUNDS OR SHARES";
+                tempTrade.status = "ORDER " + std::to_string(id) + " FAILED TO FILL: LACK OF FUNDS OR SHARES";
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
                 history[it->first] = tempTrade;
+                it = orders.erase(it); 
             }
         }
         else{
@@ -180,8 +182,8 @@ void Broker::processOrder(int id, Order order){
         tempTrade.execPrice = currBar.open;
     }
     else if(order.type == "limit"){
-        currPrice = order.execPrice;
-        tempTrade.execPrice = order.execPrice;
+        currPrice = order.checkPrice;
+        tempTrade.execPrice = order.checkPrice;
     }
     else{
         currPrice = currBar.close;
@@ -197,7 +199,7 @@ void Broker::processOrder(int id, Order order){
     tempTrade.checkPrice = order.checkPrice;
     
     //check if position exists on user account or not and fill out order
-    if(user.checkPosition(order.ticker)){
+    if(user.positionQuantity(order.ticker)){
         if(order.side == 0){
             tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: BUY " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
             
@@ -208,7 +210,7 @@ void Broker::processOrder(int id, Order order){
             std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
         }
         else{
-            if(user.checkPositionQuantity(order.ticker) == order.quantity){
+            if(user.positionQuantity(order.ticker) == order.quantity){
                 //sell all
                 tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " ALL FOR " + " " + std::to_string(currPrice);
                 
@@ -219,7 +221,7 @@ void Broker::processOrder(int id, Order order){
                 std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
                 
             }
-            else if(user.checkPositionQuantity(order.ticker) > order.quantity){
+            else if(user.positionQuantity(order.ticker) > order.quantity){
                 tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
                 
                 user.sellPositionQuantity(order.ticker, order.quantity, currPrice);
@@ -237,7 +239,7 @@ void Broker::processOrder(int id, Order order){
     //if position does not exist(create new position or output error if selling)
     else{
         if(order.side == 1){
-            tempTrade.status = "ORDER " + std::to_string(it->first) + " FAILED TO FILL: ATTEMPT TO SELL POSITION THAT DOES NOT EXIST";
+            tempTrade.status = "ORDER " + std::to_string(id) + " FAILED TO FILL: ATTEMPT TO SELL POSITION THAT DOES NOT EXIST";
             std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
         }
         else{

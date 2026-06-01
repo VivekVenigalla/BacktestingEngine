@@ -32,13 +32,13 @@ class Broker{
         //main functions to be used by central governing script
 
         //main functions to be used by central governing script
-        void check();
+        void checkLoop();
         
-        bool checkMarketOrder(Order check);
+        bool checkOrder(Order& check);
 
-        bool checkOtherOrder(int id);
+        bool checkOrderLimitAndStop(Order check);
 
-        void processOrder(int id);
+        void processOrder(int id, Order order);
 
         //getter methods
         std::unordered_map<long int, Trade> returnHistory();

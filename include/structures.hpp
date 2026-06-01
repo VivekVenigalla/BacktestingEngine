@@ -23,9 +23,10 @@ struct Order{
     //types of orders:
     //1. market
     //2. limit
+    //3. stop
     std::string type;
     //buy(0) sell(1)
-    bool side;
+    int side;
     long quantity;
     //assuming there is a limit or stop order
     double checkPrice;
@@ -54,7 +55,7 @@ struct Trade{
     std::string type;
     bool side;
     long quantity;
-    double check_price;
+    double checkPrice;
     //figure out the commmision calculation
     double commision;
     std::string status;

@@ -78,7 +78,7 @@ double Account::positionValue(std::string ticker, double currPrice){
 }
 
 bool Account::checkPosition(std::string ticker){
-    return positions.contains(ticker);
+    return positions.count(ticker) > 0;
 } 
 
 //this function will be implemented at a later point

@@ -15,4 +15,11 @@ int main(){
     newAccount.buyNewPosition("AAPL", 20, currPrice);
     std::cout<<newAccount.positionQuantity("AAPL")<<"\n";
     std::cout<<newAccount.checkBalance()<<"\n";
+
+    Bar currBar = newData["2015-01-13 00:00:00-05:00"];
+    //create broker class
+    Broker newBroker(newAccount, currBar);
+    Order newOrder = {"PLACE", "market", 0, 10, 0.0};
+    newBroker.createOrder(newOrder);
+    
 }

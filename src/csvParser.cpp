@@ -76,7 +76,7 @@ std::map<std::string, Bar> Parser::parse(){
     //declare variables
     std::string row;
     std::map<std::string, Bar> data;
-    std::string tempticker = "PLACE"
+    std::string tempticker = "PLACE";
     //access the csv file for read only
     //to read and writ use fstream
     std::ifstream file(DATA_PATH);

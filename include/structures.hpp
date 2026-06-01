@@ -7,6 +7,7 @@
 //struct for a ohcl data plot
 //contains the date, open and close price, highest and lowest price in the period of measurement, and volume
 struct Bar{
+    std::string ticker;
     std::string date;
     double open;
     double close;
@@ -56,4 +57,5 @@ struct Trade{
     double check_price;
     //figure out the commmision calculation
     double commision;
+    std::string status;
 };

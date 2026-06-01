@@ -6,7 +6,7 @@
 
 
 
-std::map<std::string, Bar> Parser::parse(){
+std::map<std::string, Bar> Parser::parse(std::string tickertemp){
     
     //declare variables
     std::string row;
@@ -52,6 +52,7 @@ std::map<std::string, Bar> Parser::parse(){
         std::getline(ss, close_temp, ',' );
         std::getline(ss, volume_temp, ',' );
 
+        newBar.ticker = tickertemp;
         newBar.date = date_temp;
         newBar.open = std::stod(open_temp);
         newBar.high = std::stod(high_temp);
@@ -69,10 +70,13 @@ std::map<std::string, Bar> Parser::parse(){
     
 }
 
-//previous vector implementation
-/*
-std::vector<Bar> Parser::parse(){
-    //std::vector<Bar> data;
+//same function but with a placeholder ticker
+std::map<std::string, Bar> Parser::parse(){
+    
+    //declare variables
+    std::string row;
+    std::map<std::string, Bar> data;
+    std::string tempticker = "PLACE"
     //access the csv file for read only
     //to read and writ use fstream
     std::ifstream file(DATA_PATH);
@@ -114,6 +118,7 @@ std::vector<Bar> Parser::parse(){
         std::getline(ss, close_temp, ',' );
         std::getline(ss, volume_temp, ',' );
 
+        newBar.ticker = tempticker;
         newBar.date = date_temp;
         newBar.open = std::stod(open_temp);
         newBar.high = std::stod(high_temp);
@@ -122,11 +127,11 @@ std::vector<Bar> Parser::parse(){
         newBar.volume = std::stol(volume_temp);
         std::cout << newBar.date << " record uploaded...\n";
 
-        data.push_back(newBar);
+        //vector implementation => data.push_back(newBar);
+        data.insert({date_temp, newBar});
         
     }
     
     return data;
-    //iterate through the csv file
+    
 }
-*/

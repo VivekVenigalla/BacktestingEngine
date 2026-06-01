@@ -8,6 +8,7 @@ class Parser{
         //open the file
         //loop through the contents(making sure to skip the first row)
         //previous implementation => std::vector<Bar> parse();
+        std::map<std::string, Bar> parse(std::string ticker);
         std::map<std::string, Bar> parse();
     private:
         //data path to the only file in this folder for now

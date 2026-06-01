@@ -31,7 +31,7 @@ int Broker::createOrder(Order newOrder){
         }
     }
     else{
-        return 0
+        return 0;
     }
     
 }

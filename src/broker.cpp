@@ -79,7 +79,7 @@ bool Broker::checkOrder(Order& check){
     //sell
     else{
         long tempShares = user.positionQuantity(check.ticker);
-        if(check.quantity >= tempShares){
+        if(check.quantity > tempShares){
             return false;
         }
         else{

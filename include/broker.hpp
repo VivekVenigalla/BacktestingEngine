@@ -41,8 +41,8 @@ class Broker{
         void processOrder(int id, Order order);
 
         //getter methods
-        std::unordered_map<long int, Trade> returnHistory();
-        std::unordered_map<long int, Order> returnOrders();
+        std::unordered_map<long int, Trade>& returnHistory();
+        std::unordered_map<long int, Order>& returnOrders();
         
         
     private:

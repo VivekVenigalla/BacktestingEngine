@@ -259,9 +259,9 @@ void Broker::processOrder(int id, Order order){
     
 }
 
-std::unordered_map<long int, Trade> Broker::returnHistory(){
+std::unordered_map<long int, Trade>& Broker::returnHistory(){
     return history;
 }
-std::unordered_map<long int, Order> Broker::returnOrders(){
+std::unordered_map<long int, Order>& Broker::returnOrders(){
     return orders;
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <iostream>
 
 //data considerations(keep in csv parser)
 //consider the width of time intervals for ohcl data
@@ -14,6 +15,15 @@ struct Bar{
     double high;
     double low;
     long volume;
+
+    void print() const{
+        std::cout<<ticker << " @ " << date << " :" << std::endl;
+        std::cout<<"Open = " << open << std::endl;
+        std::cout<<"High = " << high << std::endl;
+        std::cout<<"Low = " << low << std::endl;
+        std::cout<<"Close = " << close << std::endl;
+        std::cout<<"Volume = " << volume << std::endl;
+    }
 };
 
 //struct for a order

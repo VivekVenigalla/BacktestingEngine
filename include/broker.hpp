@@ -34,11 +34,6 @@ class Broker{
         //main functions to be used by central governing script
         void checkLoop();
         
-        bool checkOrder(Order& check);
-
-        bool checkOrderLimitAndStop(Order check);
-
-        void processOrder(int id, Order order);
 
         //getter methods
         std::unordered_map<long int, Trade>& returnHistory();
@@ -46,6 +41,7 @@ class Broker{
         
         
     private:
+
         //need a vector of orders that will be accessed by the Broker every Bar to execute limit or market
         //orders.first => order id(unique)
         int tempID = 1;
@@ -55,6 +51,12 @@ class Broker{
         std::unordered_map<long int, Order> orders;
         std::unordered_map<long int, Trade> history;
         Bar& currBar;
+
+        bool checkOrder(Order& check);
+
+        bool checkOrderLimitAndStop(Order check);
+
+        void processOrder(int id, Order order);
         
         
 };

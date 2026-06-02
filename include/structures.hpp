@@ -16,14 +16,7 @@ struct Bar{
     double low;
     long volume;
 
-    void print() const{
-        std::cout<<ticker << " @ " << date << " :" << std::endl;
-        std::cout<<"Open = " << open << std::endl;
-        std::cout<<"High = " << high << std::endl;
-        std::cout<<"Low = " << low << std::endl;
-        std::cout<<"Close = " << close << std::endl;
-        std::cout<<"Volume = " << volume << std::endl;
-    }
+    void print() const;
 };
 
 //struct for a order
@@ -38,8 +31,10 @@ struct Order{
     //buy(0) sell(1)
     int side;
     long quantity;
-    //assuming there is a limit or stop order
+    //assuming there is a limit or stop order else == -1
     double checkPrice;
+
+    void print() const;
 };
 
 //current value of a pertaining ticker
@@ -48,6 +43,8 @@ struct Position{
     std::string ticker;
     long quantity;
     double average_entry_price;
+
+    void print() const;
 //add more if needed
 };
 
@@ -70,4 +67,6 @@ struct Trade{
     double commision;
     std::string status;
     double currBalance;
+
+    void print() const;
 };

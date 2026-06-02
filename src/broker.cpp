@@ -194,7 +194,7 @@ void Broker::processOrder(int id, Order order){
     tempTrade.ticker = order.ticker;
     tempTrade.execPrice = currPrice;
     tempTrade.type = order.type;
-    tempTrade.side = order.quantity;
+    tempTrade.side = order.side;
     tempTrade.quantity = order.quantity;
     tempTrade.checkPrice = order.checkPrice;
     

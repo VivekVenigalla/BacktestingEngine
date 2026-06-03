@@ -1,9 +1,12 @@
 #include <iostream>
 #include <string>
+#include <memory>
 #include "../include/csvParser.hpp"
 #include "../include/account.hpp"
 #include "../include/broker.hpp"
 #include "../include/dataFeed.hpp"
+#include "../include/strategy.hpp"
+
 
 int main(){
     Data feed;
@@ -12,6 +15,8 @@ int main(){
     Broker newBroker(newAccount, bar);
     std::unordered_map<long int, Trade>& historyRef = newBroker.returnHistory();
     std::unordered_map<long int, Order>& orderRef = newBroker.returnOrders();
+
+    //integrate strategy here
     
     newAccount.buyNewPosition("PLACE", 20, bar.open);
     //std::cout<<newAccount.positionQuantity("AAPL")<<"\n";

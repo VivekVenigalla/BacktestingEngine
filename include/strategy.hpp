@@ -10,7 +10,7 @@
 
 class Strategy{
     public:
-        Strategy(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history);
+        Strategy(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol);
 
         //this method lets the strategy know that the Bar reference has been changed and it can append it to its history
         void loadBar();
@@ -26,6 +26,7 @@ class Strategy{
         Broker& broker;
         Account& user;
         Bar& connectBar;
+        std::string ticker;
 
 
 };

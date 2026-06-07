@@ -1,6 +1,6 @@
 #include "../include/strategy.hpp"
 
-Strategy::Strategy(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history) : broker(b), user(u), connectBar(cB), tradeHistory(history){
+Strategy::Strategy(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol) : broker(b), user(u), connectBar(cB), tradeHistory(history), ticker(symbol){
 } 
 
 void Strategy::loadBar(){

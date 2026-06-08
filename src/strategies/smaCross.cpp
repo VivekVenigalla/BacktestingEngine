@@ -4,10 +4,10 @@
 #include <iostream>
 
 
-smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol) : broker(b), user(u), connectBar(cB), tradeHistory(history), ticker(symbol){
+smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol) : Strategy(b, u, cB, history, symbol){
 }
 
-smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow) : broker(b), user(u), connectBar(cB), tradeHistory(history), ticker(symbol), fastLength(fast), slowLength(slow){
+smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow) : Strategy(b, u, cB, history, symbol), fastLength(fast), slowLength(slow){
     if (fastLength >= slowLength) {
         std::cerr << "WARNING: Fast SMA period should be less than Slow SMA period. Adjusting values...\n";
         fastLength = 50;

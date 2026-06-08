@@ -23,17 +23,35 @@ int main(){
     std::cin >> stratType;
     std::cout << std::endl;
     
-    std::unique_ptr<Strategy> strategy = create(newBroker, newAccount, bar, historyRef, "PLACE", stratType);
+    std::unique_ptr<Strategy> strategy = StrategyFactory::create(newBroker, newAccount, bar, historyRef, "PLACE", stratType);
 
     strategy->init();
     
+    std::cout<<"Current Bar: " << bar.date << " Current Balance: " << newAccount.checkBalance() << "\n";
+    feed.nextBar();
+    std::cout<<"Current Bar: " << bar.date << " Current Balance: " << newAccount.checkBalance() << "\n";
     
-    //integrate strategy here
+    //main loop
+    //check if the feed has more data
+    int currBar = 1;
+    while(feed.hasMoreData()){
+        //if the feed has more data, then first update the strategy with the data
+        bar = feed.getBar();
+        strategy->loadBar();
+        strategy->runBar();
+        newBroker.checkLoop();
+        std::cout<<"Current Bar: " << bar.date << " Current Balance: " << newAccount.checkBalance() << "\n";
+        feed.nextBar();
+    }
     
+    
+
+    
+    /*
     newAccount.buyNewPosition("PLACE", 20, bar.open);
     //std::cout<<newAccount.positionQuantity("AAPL")<<"\n";
     std::cout<<newAccount.checkBalance()<<"\n";
-
+    bar.print();
     
 
 
@@ -46,11 +64,15 @@ int main(){
     //currBar = newData["2015-01-29 00:00:00-05:00"];
     if(feed.hasMoreData()){
         feed.nextBar();
+        bar = feed.getBar();
         std::cout<<bar.high<<"\n";
     }
+    bar.print();
     newOrder = {"PLACE", "limit", 1, 15, 26.0};
     int id = newBroker.createOrder(newOrder);
     std::cout << id<< " " << newAccount.positionQuantity("PLACE") <<  std::endl;
     newBroker.checkLoop();
+    
     //historyRef[2].print();
+    */
 }

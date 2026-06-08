@@ -5,6 +5,8 @@ static std::unique_ptr<Strategy> StrategyFactory::create(Broker& b, Account& u, 
 
     if(typeStrat == "sma"){
         //for now we will only use the default constructor
-        return std::make_unique<smaCross>(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol);
+        return std::make_unique<smaCross>(b,u,cB,history,symbol);
     }
+
+    return nullptr;
 }

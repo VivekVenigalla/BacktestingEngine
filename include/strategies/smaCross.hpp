@@ -20,8 +20,8 @@ class smaCross : public Strategy{
         void runBar();
         virtual ~smaCross() = default;
     private:
-        int slowLength;
-        int fastLength;
+        int slowLength = 200;
+        int fastLength = 50;
 
         double fastSum;
         double slowSum;

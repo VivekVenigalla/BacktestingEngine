@@ -3,7 +3,7 @@
 //cmath includes the operations such as floor
 
 
-smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol) : broker(b), user(u), connectBar(cB), tradeHistory(history), ticker(symbol), fastLength(50), slowLength(200){
+smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol) : broker(b), user(u), connectBar(cB), tradeHistory(history), ticker(symbol){
 }
 
 smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow) : broker(b), user(u), connectBar(cB), tradeHistory(history), ticker(symbol), fastLength(fast), slowLength(slow){
@@ -58,7 +58,7 @@ void smaCross::runBar(){
             check = true;
         }
         else if(fastAverage < slowAverage){
-            long numShares = user.checkPosition(ticker);
+            long numShares = user.positionQuantity(ticker);
             nextOrder = {ticker, "market", 1, numShares, -1.0};
             check = true;
         }

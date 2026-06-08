@@ -6,7 +6,9 @@
 #include "../include/broker.hpp"
 #include "../include/dataFeed.hpp"
 #include "../include/strategy.hpp"
-
+#include "../include/createStrat.hpp"
+//check if this below is needed
+#include "../include/strategies/smaCross.hpp"
 
 int main(){
     Data feed;
@@ -15,7 +17,17 @@ int main(){
     Broker newBroker(newAccount, bar);
     std::unordered_map<long int, Trade>& historyRef = newBroker.returnHistory();
     std::unordered_map<long int, Order>& orderRef = newBroker.returnOrders();
+    std::string stratType;
+    
+    std::cout << "Strategy input : ";
+    std::cin >> stratType;
+    std::cout << std::endl;
+    
+    std::unique_ptr<Strategy> strategy = create(newBroker, newAccount, bar, historyRef, "PLACE", stratType);
 
+    strategy->init();
+    
+    
     //integrate strategy here
     
     newAccount.buyNewPosition("PLACE", 20, bar.open);

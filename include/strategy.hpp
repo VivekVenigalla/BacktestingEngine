@@ -16,6 +16,7 @@ class Strategy{
         void loadBar();
         virtual ~Strategy() = default;
         virtual void runBar() = 0;
+        virtual void init() = 0;
         
     protected:
         //protected allows the following member fields to be accessed inside the class and inherited classes

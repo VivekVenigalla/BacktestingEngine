@@ -1,6 +1,7 @@
 #include "../../include/strategies/smaCross.hpp"
 #include <cmath>
 //cmath includes the operations such as floor
+#include <iostream>
 
 
 smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol) : broker(b), user(u), connectBar(cB), tradeHistory(history), ticker(symbol){
@@ -14,7 +15,9 @@ smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, 
     }
 }
 
-
+void smaCross::init(){
+    std::cout << "Created a SMA Strategy" << std::endl;
+}
 
 void smaCross::runBar(){
     //execute orders if the exist the previous day here

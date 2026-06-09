@@ -6,7 +6,7 @@ class Data{
 
     public:
         Data();
-
+        Data(std::string ticker);
         void nextBar();
         Bar& getBar();
         bool hasMoreData();

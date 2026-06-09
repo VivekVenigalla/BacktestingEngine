@@ -11,7 +11,10 @@
 #include "../include/strategies/smaCross.hpp"
 
 int main(){
-    Data feed;
+
+    //implement stock selection here later when python csv downloader is integrated
+    std::vector<std::string> tickers = {"AAPL"}
+    Data feed("AAPL");
     Bar& bar = feed.getBar();
     Account newAccount(1200.0);
     Broker newBroker(newAccount, bar);
@@ -22,8 +25,9 @@ int main(){
     std::cout << "Strategy input : ";
     std::cin >> stratType;
     std::cout << std::endl;
-    
-    std::unique_ptr<Strategy> strategy = StrategyFactory::create(newBroker, newAccount, bar, historyRef, "PLACE", stratType);
+
+    //strategies at this point can only use one stock in reference, integrate multiple stocks option later
+    std::unique_ptr<Strategy> strategy = StrategyFactory::create(newBroker, newAccount, bar, historyRef, "AAPL", stratType);
 
     strategy->init();
     

@@ -1,6 +1,7 @@
 #pragma once
 #include "structures.hpp"
 #include <unordered_map>
+#include <vector>
 //requires structures.hpp for the position struct
 
 //
@@ -28,6 +29,7 @@ class Account{
         long positionQuantity(std::string ticker);
         double positionValue(std::string ticker, double currPrice);
         bool checkPosition(std::string ticker);
+        double accountValue(std::vector<std::string> alltickers);
         //double checkTotalEquity();
         
 

@@ -5,6 +5,11 @@ Data::Data(){
     currBar = data.begin();
 }
 
+Data::Data(std::string ticker){
+    data = parser.parse(ticker);
+    currBar = data.begin();
+}
+
 void Data::nextBar(){
     ++currBar;
 }

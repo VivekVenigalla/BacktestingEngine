@@ -81,6 +81,14 @@ bool Account::checkPosition(std::string ticker){
     return positions.count(ticker) > 0;
 } 
 
+double Account::accountValue(const std::vector<std::string> allTickers){
+    double temp = balance;
+    for(const auto& element : allTickers){
+        temp+=positionValue(element);
+    }
+    return temp;
+}
+
 //this function will be implemented at a later point
 //total equity = cash value + value of all positions
 //instead of passing all args at once, create a file that manages data for all of the tickers history

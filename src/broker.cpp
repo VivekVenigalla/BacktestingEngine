@@ -35,8 +35,8 @@ int Broker::createOrder(Order newOrder){
         tempTrade.side = newOrder.quantity;
         tempTrade.quantity = newOrder.quantity;
         tempTrade.checkPrice = newOrder.checkPrice;
-        
-        tempTrade.status = "ORDER " + std::to_string(tempID) + " FAILED TO FILL: LACK OF FUNDS OR SHARES";
+        tempTrade.filled = false;
+        tempTrade.status = "ORDER " + std::to_string(tempID) + " FAILED TO FILL: LACK OF FUNDS OR SHARES OR ATTEMPT TO ORDER 0 SHARES";
         history[tempID] = tempTrade;
     }
     ++tempID;
@@ -48,8 +48,13 @@ int Broker::createOrder(Order newOrder){
 //param:reference to the order to check to preserve memory and efficiency of not having to copy the order again
 //return: bool=> true if executable at time requested and false if not
 bool Broker::checkOrder(Order& check){
+    //if the position quantity is 0, immediately return false
+    if(check.quantity ==0){
+        return false;
+    }
+    
     //check if the account has sufficient funds or if they have enough shares
-
+    
     //buy
     if(check.side == 0){
         double tempBalance = user.checkBalance();
@@ -110,8 +115,8 @@ void Broker::checkLoop(){
                 tempTrade.side = order.quantity;
                 tempTrade.quantity = order.quantity;
                 tempTrade.checkPrice = order.checkPrice;
-                
-                tempTrade.status = "ORDER " + std::to_string(id) + " FAILED TO FILL: LACK OF FUNDS OR SHARES";
+                tempTrade.filled = false;
+                tempTrade.status = "ORDER " + std::to_string(id) + " FAILED TO FILL: LACK OF FUNDS OR SHARES OR ATTEMPT TO ORDER 0 SHARES";
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
                 history[it->first] = tempTrade;
                 it = orders.erase(it); 
@@ -199,8 +204,9 @@ void Broker::processOrder(int id, Order order){
     tempTrade.checkPrice = order.checkPrice;
     
     //check if position exists on user account or not and fill out order
-    if(user.positionQuantity(order.ticker)){
+    if(user.checkPosition(order.ticker)){
         if(order.side == 0){
+            tempTrade.filled = true;
             tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: BUY " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
             
             user.buyPositionQuantity(order.ticker, order.quantity, currPrice);
@@ -212,6 +218,7 @@ void Broker::processOrder(int id, Order order){
         else{
             if(user.positionQuantity(order.ticker) == order.quantity){
                 //sell all
+                tempTrade.filled = true;
                 tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " ALL FOR " + " " + std::to_string(currPrice);
                 
                 user.sellAllPosition(order.ticker, currPrice);
@@ -222,6 +229,7 @@ void Broker::processOrder(int id, Order order){
                 
             }
             else if(user.positionQuantity(order.ticker) > order.quantity){
+                tempTrade.filled = true;
                 tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
                 
                 user.sellPositionQuantity(order.ticker, order.quantity, currPrice);
@@ -239,10 +247,12 @@ void Broker::processOrder(int id, Order order){
     //if position does not exist(create new position or output error if selling)
     else{
         if(order.side == 1){
+            tempTrade.filled = false;
             tempTrade.status = "ORDER " + std::to_string(id) + " FAILED TO FILL: ATTEMPT TO SELL POSITION THAT DOES NOT EXIST";
             std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
         }
         else{
+            tempTrade.filled = true;
             tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: BUY " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
             
             user.buyNewPosition(order.ticker, order.quantity, currPrice);

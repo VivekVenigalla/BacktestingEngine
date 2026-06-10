@@ -29,7 +29,8 @@ class Account{
         long positionQuantity(std::string ticker);
         double positionValue(std::string ticker, double currPrice);
         bool checkPosition(std::string ticker);
-        double accountValue(std::vector<std::string> alltickers);
+        //need to create a unordered map of all prices for all tickers
+        double accountValue(const std::vector<std::string> alltickers, double currPrice);
         //double checkTotalEquity();
         
 

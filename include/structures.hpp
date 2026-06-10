@@ -65,6 +65,7 @@ struct Trade{
     double checkPrice;
     //figure out the commmision calculation
     double commision;
+    bool filled;
     std::string status;
     double currBalance;
 

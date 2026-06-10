@@ -9,17 +9,26 @@
 #include "../include/createStrat.hpp"
 //check if this below is needed
 #include "../include/strategies/smaCross.hpp"
+#include "../include/performanceEval.hpp"
+
 
 int main(){
 
     //implement stock selection here later when python csv downloader is integrated
-    std::vector<std::string> tickers = {"AAPL"}
+    std::vector<std::string> tickers = {"AAPL"};
+    double initBalance = 1200.0;
+
+
+    
     Data feed("AAPL");
     Bar& bar = feed.getBar();
-    Account newAccount(1200.0);
+    Account newAccount(initBalance);
     Broker newBroker(newAccount, bar);
     std::unordered_map<long int, Trade>& historyRef = newBroker.returnHistory();
     std::unordered_map<long int, Order>& orderRef = newBroker.returnOrders();
+    Metrics calculate(newAccount, historyRef, tickers);
+    
+    
     std::string stratType;
     
     std::cout << "Strategy input : ";
@@ -37,7 +46,6 @@ int main(){
     
     //main loop
     //check if the feed has more data
-    int currBar = 1;
     while(feed.hasMoreData()){
         //if the feed has more data, then first update the strategy with the data
         bar = feed.getBar();
@@ -47,9 +55,22 @@ int main(){
         std::cout<<"Current Bar: " << bar.date << " Current Balance: " << newAccount.checkBalance() << "\n";
         feed.nextBar();
     }
+    //full history of trades that were executed
+    //iterate over the historyRef
+    for(const auto& [key, value] : historyRef){
+        //using the print function of the trade struct
+        if(value.filled){
+            value.print();
+        }
+        
+    }
     
+    //metrics
+    double returns = calculate.totalReturn(initBalance, bar.close);
+    double cagr = calculate.cagr(initBalance, bar.close, 10);
     
-
+    std::cout<<"Total return: " << returns << std::endl;
+    std::cout<<"CAGR: " << cagr << std::endl;
     
     /*
     newAccount.buyNewPosition("PLACE", 20, bar.open);

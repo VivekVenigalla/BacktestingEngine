@@ -39,6 +39,7 @@ class Account{
         //map of all the positions in the account
         //positions.first => ticker, positions.second=> Position struct
         std::unordered_map<std::string, Position> positions;
+        //map of all positions at every time instant
         int numPositions;
 
         

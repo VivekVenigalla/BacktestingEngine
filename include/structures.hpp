@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <iostream>
-
+#include <unordered_map>
 //data considerations(keep in csv parser)
 //consider the width of time intervals for ohcl data
 
@@ -46,6 +46,17 @@ struct Position{
 
     void print() const;
 //add more if needed
+};
+
+//equity snapshot that allows plotting
+struct EquitySnap{
+    std::string ticker;
+    std::string date;
+    Bar& bar;
+    double balance;
+    double totalValue;
+    //position(second) snap shot for each ticker(first element)
+    std::unordered_map<std::string, Position>;
 };
 
 //an order will be for contacting the broker class to transfer stocks

@@ -24,8 +24,12 @@ int main(){
     Bar& bar = feed.getBar();
     Account newAccount(initBalance);
     Broker newBroker(newAccount, bar);
+    //history of orders and trades
     std::unordered_map<long int, Trade>& historyRef = newBroker.returnHistory();
     std::unordered_map<long int, Order>& orderRef = newBroker.returnOrders();
+
+    //history of positions
+    std::unordered_map<Position>& posRef
     Metrics calculate(newAccount, historyRef, tickers);
     
     
@@ -72,32 +76,4 @@ int main(){
     std::cout<<"Total return: " << returns << std::endl;
     std::cout<<"CAGR: " << cagr << std::endl;
     
-    /*
-    newAccount.buyNewPosition("PLACE", 20, bar.open);
-    //std::cout<<newAccount.positionQuantity("AAPL")<<"\n";
-    std::cout<<newAccount.checkBalance()<<"\n";
-    bar.print();
-    
-
-
-    
-
-    Order newOrder = {"PLACE", "market", 0, 10, -1.0};
-    newBroker.createOrder(newOrder);
-    historyRef[1].print();
-    
-    //currBar = newData["2015-01-29 00:00:00-05:00"];
-    if(feed.hasMoreData()){
-        feed.nextBar();
-        bar = feed.getBar();
-        std::cout<<bar.high<<"\n";
-    }
-    bar.print();
-    newOrder = {"PLACE", "limit", 1, 15, 26.0};
-    int id = newBroker.createOrder(newOrder);
-    std::cout << id<< " " << newAccount.positionQuantity("PLACE") <<  std::endl;
-    newBroker.checkLoop();
-    
-    //historyRef[2].print();
-    */
 }

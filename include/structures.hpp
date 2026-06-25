@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream>
 #include <unordered_map>
+#include <vector>
 //data considerations(keep in csv parser)
 //consider the width of time intervals for ohcl data
 
@@ -49,14 +50,23 @@ struct Position{
 };
 
 //equity snapshot that allows plotting
-struct EquitySnap{
-    std::string ticker;
+struct History{
+    /*std::string ticker;
     std::string date;
     Bar& bar;
     double balance;
     double totalValue;
     //position(second) snap shot for each ticker(first element)
-    std::unordered_map<std::string, Position>;
+    std::unordered_map<std::string, Position>;*/
+
+    //handles multiple tickers
+    std::vector<std::string> dates;
+    std::vector<std::unordered_map<std::string, Bar>> bars;
+    std::vector<double> balances;
+    std::vector<double> totalEquity;
+    std::vector<std::unordered_map<std::string, Position>> positions;
+    //uses the lookup map in the logger
+    void print_with_date(int index) const;
 };
 
 //an order will be for contacting the broker class to transfer stocks

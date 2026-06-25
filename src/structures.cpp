@@ -31,6 +31,24 @@ void Position::print() const{
     std::cout<<"Average Entry Price = " << average_entry_price << std::endl;
 }
 
+void History::print_with_date(int index) const{
+    std::cout<<"Date: " << dates[index] << std::endl;
+
+    //iterate over all bar with tickers
+    std::unordered_map<std::string, Bar> tempBars = bars[index];
+    for(const auto& [key, value] : tempBars){
+        value.print();
+    }
+
+    std::cout<<"Balance: " << balances[index] << std::endl;
+    std::cout<<"Total Equity: " << totalEquity[index] << std::endl;
+
+    std::unordered_map<std::string, Position> tempPos = positions[index];
+    for(const auto& [key, value] : tempPos){
+        value.print();
+    }
+}
+
 void Trade::print() const{
     std::cout<<"Ticker = " << ticker << std::endl;
     std::cout<<"Type = " << type << std::endl;

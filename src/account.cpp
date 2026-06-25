@@ -60,7 +60,8 @@ void Account::sellPositionQuantity(std::string ticker, long quantityChange, doub
 
 void Account::sellAllPosition(std::string ticker, double currentPrice){
     balance+=positions[ticker].quantity*currentPrice;
-    positions.erase(ticker);
+    //since the graph should be able to indicate also when the strategy sells all of a position, the position is not erased
+    positions[ticker].quantity = 0;
     
 }
 
@@ -84,11 +85,17 @@ bool Account::checkPosition(std::string ticker){
 double Account::accountValue(const std::vector<std::string> allTickers, double currPrice){
     double temp = balance;
     for(const auto& element : allTickers){
-        std::cout<<"Position Quantity: "<<positionQuantity(element)<<std::endl;
-        std::cout<<"AEP: "<<positionAEP(element)<<std::endl;
-        temp+=positionValue(element, currPrice);
+        if(checkPosition(element)){
+            //std::cout<<"Position Quantity: "<<positionQuantity(element)<<std::endl;
+            //std::cout<<"AEP: "<<positionAEP(element)<<std::endl;
+            temp+=positionValue(element, currPrice);
+        }
     }
     return temp;
+}
+
+std::unordered_map<std::string, Position> Account::returnPositions(){
+    return positions;
 }
 
 //this function will be implemented at a later point

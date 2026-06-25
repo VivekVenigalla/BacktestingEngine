@@ -33,6 +33,7 @@ class Account{
         double accountValue(const std::vector<std::string> alltickers, double currPrice);
         //double checkTotalEquity();
         
+        std::unordered_map<std::string, Position> returnPositions();
 
     private:
         double balance = 10000.0;

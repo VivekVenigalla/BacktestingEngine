@@ -31,16 +31,24 @@ void Logger::exportCSV(std::string filename){
     }
     else{
         //only focus on these values shown below, will look into position and bar values later
-        file << "Date,Balance,Equity\n";
+        file << "Date,Balance,Equity,Ticker,BarOpen,BarHigh,BarLow,BarClose,BarVolume,Quantity,AEP\n";
         
         //loop through the vectors and input them one by one
+        //for each ticker the csv has another row with the same date
         for(int i =0; i < fullHistory.dates.size(); i++){
-            file << fullHistory.dates[i] << ",";
-            
-            
-            file << fullHistory.balances[i] << ","
-                 << fullHistory.totalEquity[i] << "\n";
-            
+            for(const auto& [key, value] : fullHistory.bars[i]){
+                file << fullHistory.dates[i] << ","
+                << fullHistory.balances[i] << ","
+                << fullHistory.totalEquity[i] << ","
+                << value.open << ","
+                << value.high << ","
+                << value.low << ","
+                << value.close << ","
+                << value.volume << ","
+                << fullHistory.positions[i][key].quantity << ","
+                << fullHistory.positions[i][key].average_entry_price << "\n";
+                 
+            }
         }
 
         file.close();

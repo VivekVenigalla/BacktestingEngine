@@ -12,9 +12,12 @@ class Account{
         //types of instantiation
         //1. only starting balance included
         //2. ask for initial positions
+        //3. provide initial positions
         Account(double initBalance);
 
         Account(double initBalance, bool initPos);
+
+        Account(double initBalance, std::vector<std::string> tickers);
 
         //helper functions
         double checkBalance();

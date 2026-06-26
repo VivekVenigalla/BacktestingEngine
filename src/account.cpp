@@ -25,6 +25,13 @@ Account::Account(double initBalance, bool initPos){
     }
 }
 
+Account::Account(double initBalance, std::vector<std::string> tickers){
+    balance = initBalance;
+    for(int i = 0; i < tickers.size(); i++){
+        buyNewPosition(tickers[i], 0, 0.0);
+    }
+}
+
 //helper functions
 
 //balance

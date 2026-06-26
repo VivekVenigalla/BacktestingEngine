@@ -21,7 +21,7 @@ int main(){
     
     Data feed("AAPL");
     Bar& bar = feed.getBar();
-    Account newAccount(initBalance);
+    Account newAccount(initBalance, tickers);
     Broker newBroker(newAccount, bar);
     Logger logger;
     //history of orders and trades
@@ -89,7 +89,9 @@ int main(){
 
     //checking logger
     //date : 2015-01-12 00:00:00-05:00
-    logger.printSnapshot("2015-04-20 00:00:00-05:00");
-    
+    //logger.printSnapshot("2015-04-20 00:00:00-05:00");
+
+    std::string filename = "../data/test.csv";
+    logger.exportCSV(filename);
     
 }

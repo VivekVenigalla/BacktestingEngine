@@ -1,4 +1,6 @@
 #include "../include/logger.hpp"
+#include <fstream>
+
 
 void Logger::logSnapshot(std::string date, std::unordered_map<std::string, Bar> bar, double balance, double equity, std::unordered_map<std::string, Position> pos){
     //insert the snapshot into the structure
@@ -16,4 +18,33 @@ void Logger::logSnapshot(std::string date, std::unordered_map<std::string, Bar> 
 
 void Logger::printSnapshot(std::string date){
     fullHistory.print_with_date(lookupMap[date]);
+}
+
+//filename requires a proper directory
+void Logger::exportCSV(std::string filename){
+    //ofstream only allows writing to files
+    std::ofstream file(filename);
+
+    if(!file){
+        std::cout<<"File " << filename << " unable to be created. Terminating export..." << std::endl;
+        return;
+    }
+    else{
+        //only focus on these values shown below, will look into position and bar values later
+        file << "Date,Balance,Equity\n";
+        
+        //loop through the vectors and input them one by one
+        for(int i =0; i < fullHistory.dates.size(); i++){
+            file << fullHistory.dates[i] << ",";
+            
+            
+            file << fullHistory.balances[i] << ","
+                 << fullHistory.totalEquity[i] << "\n";
+            
+        }
+
+        file.close();
+
+        std::cout<<"File " << filename << " created..." << std::endl;
+    }
 }

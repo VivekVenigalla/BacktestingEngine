@@ -25,6 +25,8 @@ date_set = True
 for t in tickers:
     temp = yf.Ticker(t)
     data = temp.history(start = start_date, end = end_date, interval = interval_set, auto_adjust = auto_adjust_set, prepost = False, actions = False)
+    data.index = data.index.strftime("%Y-%m-%d")
+    #loop through the 
     print(data.head(3))
-    data.to_csv("./data/" + t + "_" + "interval_set" + ".csv", index = date_set)
+    data.to_csv("./data/" + t + "_" + interval_set + ".csv", index = date_set)
     print("Sucessful data upload")

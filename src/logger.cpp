@@ -47,7 +47,6 @@ void Logger::exportCSV(std::string filename){
                 << value.volume << ","
                 << fullHistory.positions[i][key].quantity << ","
                 << fullHistory.positions[i][key].average_entry_price << "\n";
-                 
             }
         }
 

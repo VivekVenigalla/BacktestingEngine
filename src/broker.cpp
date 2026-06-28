@@ -9,7 +9,9 @@ Broker::Broker(Account& account, Bar& connectBar) : user(account),currBar(connec
     //no additional construction needed for now, since user and currBar is already referenced
 }
 
-
+Broker::Broker(Account& account, Bar& connectBar, double commision, double slippage) : user(account),currBar(connectBar),commisionFee(commision),slippageRate(slippage){
+    
+}
 
 
 
@@ -72,6 +74,8 @@ bool Broker::checkOrder(Order& check){
             currPrice = currBar.close;
         
         }
+        //add the commision fee
+        currPrice += commisionFee;
         if(tempBalance >= currPrice*check.quantity){
             return true;
         }
@@ -139,6 +143,7 @@ bool Broker::checkOrderLimitAndStop(Order check){
     //  limit: buy only if Bar's low is smaller than check_price and sell if Bar's high is larger than check_price
     //  stop : vice versa
     //then check if either the account has sufficient funds or if they have enough shares 
+    //these checks do not include the commision fee
     if(check.type == "limit"){
         if(check.side == 0){
             if(currBar.low <= check.checkPrice){
@@ -183,16 +188,30 @@ void Broker::processOrder(int id, Order order){
 
     //This implementation for the execPrice is shortsighted as we are using only 1 day intervals. change in the future
     if(order.type == "market"){
-        currPrice = currBar.open;
-        tempTrade.execPrice = currBar.open;
+        if(order.side ==0){
+            currPrice = (currBar.open)*(1.0+slippageRate)+commisionFee;  
+        }
+        else{
+            currPrice = (currBar.open)*(1.0-slippageRate)-commisionFee; 
+        }
+        tempTrade.execPrice = currPrice;  
     }
     else if(order.type == "limit"){
-        currPrice = order.checkPrice;
-        tempTrade.execPrice = order.checkPrice;
+        if(order.side ==0){
+            currPrice = (order.checkPrice)*(1.0+slippageRate)+commisionFee;  
+        }
+        else{
+            currPrice = (order.checkPrice)*(1.0-slippageRate)-commisionFee;   
+        }
+        tempTrade.execPrice = currPrice; 
     }
     else{
-        currPrice = currBar.close;
-        tempTrade.execPrice = currBar.close;
+        if(order.side ==0){
+            currPrice = (currBar.close)*(1.0+slippageRate)+commisionFee;  
+        }
+        else{
+            currPrice = (currBar.close)*(1.0-slippageRate)-commisionFee; 
+        }
     }
 
     //create trade histroy record

@@ -19,6 +19,8 @@ class Broker{
         //since the broker has a reference to the currBar in main.cpp, there is no need for a function to assign the bar every main iteration
         Broker(Account& account, Bar& connectBar);
 
+        Broker(Account& account, Bar& connectBar, double commision, double slippage);
+
         //the following three functions are to be used by the stratgey.hpp/cpp
         //the strategy will create the Order struct and send it to be processed by the Broker.
         //will most likely be a int to return the id of the Order for future reference of the strategy)
@@ -46,6 +48,10 @@ class Broker{
         //orders.first => order id(unique)
         int tempID = 1;
         Account& user;
+        //standard commision fee will be 1 dollar unless changed in constructor
+        double commisionFee = 1.00;
+        //standard slippage rate will be 0.05% unless changed in constructor
+        double slippageRate = 0.0005;
         //order history will stay with strategy so the references can stay intact
         //since market orders are prioritized first, they are in a seperate unordered map in order to iterate through them first for processing
         std::unordered_map<long int, Order> orders;

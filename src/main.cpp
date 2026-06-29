@@ -9,6 +9,7 @@
 #include "../include/createStrat.hpp"
 //check if this below is needed
 #include "../include/strategies/smaCross.hpp"
+#include "../include/strategies/bollBand.hpp"
 #include "../include/performanceEval.hpp"
 #include "../include/logger.hpp"
 

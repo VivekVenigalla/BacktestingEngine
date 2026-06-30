@@ -10,6 +10,7 @@
 //check if this below is needed
 #include "../include/strategies/smaCross.hpp"
 #include "../include/strategies/bollBand.hpp"
+#include "../include/strategies/donChannel.hpp"
 #include "../include/performanceEval.hpp"
 #include "../include/logger.hpp"
 
@@ -60,10 +61,9 @@ int main(){
         //if the feed has more data, then first update the strategy with the data
         bar = feed.getBar();
         tempBarLog["AAPL"] = bar;
-        
+        newBroker.checkLoop();
         strategy->loadBar();
         strategy->runBar();
-        newBroker.checkLoop();
         std::cout<<"Current Bar: " << bar.date << " Current Balance: " << newAccount.checkBalance() << "\n";
         feed.nextBar();
 

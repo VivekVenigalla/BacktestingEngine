@@ -24,5 +24,5 @@ ax.set_title("Equity and Balance over Time")
 plt.tight_layout()
 
 #save the plots in a png
-plt.savefig("./plot_results/backtest_results2.png")
+plt.savefig("./plot_results/backtest_results3.png")
 plt.show()

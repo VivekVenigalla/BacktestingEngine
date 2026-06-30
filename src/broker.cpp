@@ -21,12 +21,13 @@ int Broker::createOrder(Order newOrder){
     //there is no need to have a map for market orders since they are immediately executed once requested
     //orders are checled immediately to see if they are viable with the current funds/shares
     if(checkOrder(newOrder)){
-        if(newOrder.type == "market"){
+        orders[tempID] = newOrder;
+        /*if(newOrder.type == "market"){
             processOrder(tempID, newOrder);
         }
         else{
             orders[tempID] = newOrder;
-        }
+        }*/
     }
     //null order if no availabel funds or shares
     else{
@@ -46,6 +47,23 @@ int Broker::createOrder(Order newOrder){
     
 }
 
+void Broker::deleteOrder(int orderID, std::string reason){
+    //access order using the id
+    Order newOrder = orders[orderID];
+    Trade tempTrade;
+    tempTrade.ticker = newOrder.ticker;
+    tempTrade.execPrice;
+    tempTrade.type = newOrder.type;
+    tempTrade.side = newOrder.quantity;
+    tempTrade.quantity = newOrder.quantity;
+    tempTrade.checkPrice = newOrder.checkPrice;
+    tempTrade.filled = false;
+    tempTrade.status = "ORDER " + std::to_string(tempID) + " CANCELLED : " + reason;
+    //create trade history entry
+    history[tempID] = tempTrade;
+    //erase the order
+    orders.erase(orderID);
+}
 
 //param:reference to the order to check to preserve memory and efficiency of not having to copy the order again
 //return: bool=> true if executable at time requested and false if not
@@ -102,6 +120,12 @@ void Broker::checkLoop(){
     //.begin and .end provide the iterators for the loop so we can iterate through the unordered_map
     for(auto it = orders.begin();it!=orders.end();){
         //since it is a iterator, in order to obtain the id, we use it->first
+
+        //check if it is market and immediately process if so
+        if(it->second.type == "market"){
+            processOrder(it->first, it->second);
+            it = orders.erase(it);
+        }
         if(checkOrderLimitAndStop(it->second)){
             if(checkOrder(it->second)){
                 //.erase returns a empty iterator temporarily so we prevent index invalidation

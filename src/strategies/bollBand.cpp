@@ -12,11 +12,6 @@ void bollBand::init(){
 }
 
 void bollBand::runBar(){
-    //execute orders if they exist the previous day here
-    if(check){
-        broker.createOrder(nextOrder);
-        check = false;
-    }
     
     //add value to both sums and chekc if queues are filled(connectBar will have the most recent Bar)
     double currPrice = connectBar.close;
@@ -48,7 +43,7 @@ void bollBand::runBar(){
             if(currPrice > windowAverage){
                 long numShares = std::floor(user.positionQuantity(ticker)*0.2);
                 nextOrder = {ticker, "market", 1, numShares, -1.0};
-                check = true;
+                broker.createOrder(nextOrder);
             }
             state = 0;
         }
@@ -59,7 +54,7 @@ void bollBand::runBar(){
                 long numShares = std::floor((currBalance*0.2)/currPrice);
                 //create Order struct
                 nextOrder = {ticker, "market", 0, numShares, -1.0};
-                check = true;
+                broker.createOrder(nextOrder);
             }
             state = 0;
         }

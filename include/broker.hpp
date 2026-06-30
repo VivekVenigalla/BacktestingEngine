@@ -28,7 +28,7 @@ class Broker{
 
         int createOrder(Order newOrder);
 
-
+        void deleteOrder(int orderID, std::string reason);
         //IMPORTANT NOTE:Orders can be created but cannot be changed or deleted
 
         //main functions to be used by central governing script

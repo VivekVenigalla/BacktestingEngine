@@ -20,11 +20,7 @@ void smaCross::init(){
 }
 
 void smaCross::runBar(){
-    //execute orders if the exist the previous day here
-    if(check){
-        broker.createOrder(nextOrder);
-        check = false;
-    }
+
     
     //add value to both sums and chekc if queues are filled(connectBar will have the most recent Bar)
     double currPrice = connectBar.close;
@@ -58,12 +54,12 @@ void smaCross::runBar(){
             long numShares = std::floor((currBalance*0.2)/currPrice);
             //create Order struct
             nextOrder = {ticker, "market", 0, numShares, -1.0};
-            check = true;
+            broker.createOrder(nextOrder);
         }
         else if(fastAverage < slowAverage){
             long numShares = user.positionQuantity(ticker);
             nextOrder = {ticker, "market", 1, numShares, -1.0};
-            check = true;
+            broker.createOrder(nextOrder);
         }
     }
     

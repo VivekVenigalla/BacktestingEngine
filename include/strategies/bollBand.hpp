@@ -22,7 +22,7 @@ class bollBand : public Strategy{
         virtual ~bollBand() = default;
     private:
         //bollinger bands implement a 20 period windows, hence this is a const
-        const int windowSize = 20;
+        int windowSize = 20;
         //this state tells us where the price is
         //if the state is 0, price is between upper and lower bound
         //if the state is 1, price is above upper bound
@@ -30,6 +30,7 @@ class bollBand : public Strategy{
         int state = 0;
         double windowSum;
         Order nextOrder;
+        //check is not currently used right now since the Broker::checkLoop() is executed on the next day now
         bool check = false;
         //implementing a queue allows for easy plug in and extraction so we dont have to iterate a lot.
         std::queue<double> Window;

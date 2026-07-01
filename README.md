@@ -15,7 +15,7 @@ A high-performance algorithmic trading backtesting engine built from scratch in 
 
 ---
 
-## Directory Structure
+## Directory Structure 
 
 ```text
 ├── include/

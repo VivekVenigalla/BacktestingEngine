@@ -33,7 +33,7 @@ int Broker::createOrder(Order newOrder){
     else{
         Trade tempTrade;
         tempTrade.ticker = newOrder.ticker;
-        tempTrade.execPrice;
+        tempTrade.execPrice = 0.0;
         tempTrade.type = newOrder.type;
         tempTrade.side = newOrder.quantity;
         tempTrade.quantity = newOrder.quantity;
@@ -52,7 +52,7 @@ void Broker::deleteOrder(int orderID, std::string reason){
     Order newOrder = orders[orderID];
     Trade tempTrade;
     tempTrade.ticker = newOrder.ticker;
-    tempTrade.execPrice;
+    tempTrade.execPrice = 0.0;
     tempTrade.type = newOrder.type;
     tempTrade.side = newOrder.quantity;
     tempTrade.quantity = newOrder.quantity;
@@ -125,12 +125,14 @@ void Broker::checkLoop(){
         if(it->second.type == "market"){
             processOrder(it->first, it->second);
             it = orders.erase(it);
+            continue;
         }
         if(checkOrderLimitAndStop(it->second)){
             if(checkOrder(it->second)){
                 //.erase returns a empty iterator temporarily so we prevent index invalidation
                 processOrder(it->first, it->second);
-                it = orders.erase(it);   
+                it = orders.erase(it);
+                continue;   
             }
             //passed required price but lack of funds or shares so order is nulled
             else{
@@ -138,7 +140,7 @@ void Broker::checkLoop(){
                 Order order = it->second;
                 Trade tempTrade;
                 tempTrade.ticker = order.ticker;
-                tempTrade.execPrice;
+                tempTrade.execPrice = 0.0;
                 tempTrade.type = order.type;
                 tempTrade.side = order.quantity;
                 tempTrade.quantity = order.quantity;
@@ -148,6 +150,7 @@ void Broker::checkLoop(){
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
                 history[it->first] = tempTrade;
                 it = orders.erase(it); 
+                continue;
             }
         }
         else{

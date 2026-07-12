@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 #load the csv file
 
-loader = pd.read_csv("./data/test.csv")
+loader = pd.read_csv("../data/test.csv")
 
 #create a new collumn timestamp that converts the date string into a datetime object 
 loader["Timestamp"] = pd.to_datetime(loader['Date'])
@@ -24,5 +24,5 @@ ax.set_title("Equity and Balance over Time")
 plt.tight_layout()
 
 #save the plots in a png
-plt.savefig("./plot_results/backtest_results3.png")
+plt.savefig("../plot_results/backtest_results3.png")
 plt.show()

@@ -4,7 +4,7 @@
     "notes": "test"
   },
   "account": {
-    "initial_cash": 10000.00
+    "initial_balance": 10000.00
   },
   "broker":{
     "commission_rate": 0.001,
@@ -15,7 +15,7 @@
       "ticker": "AAPL",
       "timeframe": "1D",
       "csv_filepath": "../data/AAPL_1D.csv"
-    },
+    }
   ],
   "strategy": {
     "name": "sma",

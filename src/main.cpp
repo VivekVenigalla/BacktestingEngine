@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <fstream>
 #include <memory>
 #include "../include/csvParser.hpp"
 #include "../include/account.hpp"
@@ -13,20 +14,20 @@
 #include "../include/strategies/donChannel.hpp"
 #include "../include/performanceEval.hpp"
 #include "../include/logger.hpp"
-//#include "nlohmann/json.hpp"
+#include "nlohmann/json.hpp"
 
-//using namespace json = nlohmann::json;
+using json = nlohmann::json;
 
 int main(){
     //parse the json config file and obtain the settings for sim
-    /*std::string JSON_PATH = "../config/simConfig.json";
+    std::string JSON_PATH = "../config/simConfig.json";
     std::ifstream file(JSON_PATH);
     json config;
     file >> config;
-*/
     //implement stock selection here later when python csv downloader is integrated
+
     std::vector<std::string> tickers = {"AAPL"};
-    double initBalance = 1200.0;
+    double initBalance = config["account"]["initial_balance"].get<double>();
     
 
     std::vector<Data> feeds;

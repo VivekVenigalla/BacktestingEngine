@@ -1,3 +1,5 @@
 build/
 yf_env/
 .env
+.vscode/
+data/

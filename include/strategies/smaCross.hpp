@@ -15,8 +15,8 @@
 
 class smaCross : public Strategy{
     public:
-        smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol);
-        smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow);
+        smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol);
+        smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow);
         void runBar();
         void init();
         virtual ~smaCross() = default;

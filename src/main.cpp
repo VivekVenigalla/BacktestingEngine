@@ -48,7 +48,7 @@ int main(){
 
     Account newAccount(initBalance, tickers);
     //modify so it has commision and slippage as well
-    Broker newBroker(newAccount, bars);
+    Broker newBroker(newAccount, bars, 1.0, 0.0005);
     Logger logger;
     //history of orders and trades
     std::unordered_map<long int, Trade>& historyRef = newBroker.returnHistory();

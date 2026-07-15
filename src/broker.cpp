@@ -252,6 +252,7 @@ void Broker::processOrder(int id, Order order){
     tempTrade.side = order.side;
     tempTrade.quantity = order.quantity;
     tempTrade.checkPrice = order.checkPrice;
+    tempTrade.commision = commisionFee;
     
     //check if position exists on user account or not and fill out order
     if(user.checkPosition(order.ticker)){

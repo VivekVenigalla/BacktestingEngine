@@ -4,10 +4,10 @@
 #include <iostream>
 
 
-smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol) : Strategy(b, u, cB, history, symbol){
+smaCross::smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol) : Strategy(b, u, cBs, history, symbol){
 }
 
-smaCross::smaCross(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow) : Strategy(b, u, cB, history, symbol), fastLength(fast), slowLength(slow){
+smaCross::smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow) : Strategy(b, u, cBs, history, symbol), fastLength(fast), slowLength(slow){
     if (fastLength >= slowLength) {
         std::cerr << "WARNING: Fast SMA period should be less than Slow SMA period. Adjusting values...\n";
         fastLength = 50;
@@ -23,8 +23,8 @@ void smaCross::runBar(){
 
     
     //add value to both sums and chekc if queues are filled(connectBar will have the most recent Bar)
-    double currPrice = connectBar.close;
-    
+    double currPrice = connectBars.begin()->second.close;
+    std::cout<<currPrice << std::endl;
     fastSum += currPrice;
     slowSum += currPrice;
 

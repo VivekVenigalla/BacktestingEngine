@@ -15,7 +15,7 @@
 
 class bollBand : public Strategy{
     public:
-        bollBand(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol);
+        bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol);
         
         void runBar();
         void init();

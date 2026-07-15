@@ -3,7 +3,7 @@
 #include <iostream>
 
 
-bollBand::bollBand(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol) : Strategy(b, u, cB, history, symbol){
+bollBand::bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol) : Strategy(b, u, cBs, history, symbol){
 }
 
 
@@ -14,7 +14,7 @@ void bollBand::init(){
 void bollBand::runBar(){
     
     //add value to both sums and chekc if queues are filled(connectBar will have the most recent Bar)
-    double currPrice = connectBar.close;
+    double currPrice = connectBars.begin()->second.close;
     
     windowSum += currPrice;
 

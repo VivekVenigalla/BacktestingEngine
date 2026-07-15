@@ -3,3 +3,4 @@ yf_env/
 .env
 .vscode/
 data/
+plot_results/

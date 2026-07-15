@@ -5,11 +5,11 @@
 //WORK IN PROGRESS
 //FIX create order and process order, while building method and means for obtaining the data values.
 
-Broker::Broker(Account& account, std::unordered_map<std::string,Bar> connectBar) : user(account),currBars(connectBar) {
+Broker::Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar) : user(account),currBars(connectBar) {
     //no additional construction needed for now, since user and currBar is already referenced
 }
 
-Broker::Broker(Account& account, std::unordered_map<std::string,Bar> connectBar, double commision, double slippage) : user(account),currBars(connectBar),commisionFee(commision),slippageRate(slippage){
+Broker::Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar, double commision, double slippage) : user(account),currBars(connectBar),commisionFee(commision),slippageRate(slippage){
     
 }
 

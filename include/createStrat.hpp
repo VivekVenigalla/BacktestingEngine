@@ -9,5 +9,5 @@
 class StrategyFactory{
     public:
         //since this function does not need a object class it is static
-        static std::unique_ptr<Strategy> create(Broker& b, Account& u, Bar& cB, std::unordered_map<long int, Trade>& history, std::string symbol, std::string typeStrat);
+        static std::unique_ptr<Strategy> create(Broker& b, Account& u, std::unordered_map<std::string, Bar> cBs, std::unordered_map<long int, Trade>& history, std::string symbol, std::string typeStrat);
 };

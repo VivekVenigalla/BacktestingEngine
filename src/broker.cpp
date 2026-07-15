@@ -5,11 +5,11 @@
 //WORK IN PROGRESS
 //FIX create order and process order, while building method and means for obtaining the data values.
 
-Broker::Broker(Account& account, Bar& connectBar) : user(account),currBar(connectBar) {
+Broker::Broker(Account& account, std::unordered_map<std::string,Bar> connectBar) : user(account),currBars(connectBar) {
     //no additional construction needed for now, since user and currBar is already referenced
 }
 
-Broker::Broker(Account& account, Bar& connectBar, double commision, double slippage) : user(account),currBar(connectBar),commisionFee(commision),slippageRate(slippage){
+Broker::Broker(Account& account, std::unordered_map<std::string,Bar> connectBar, double commision, double slippage) : user(account),currBars(connectBar),commisionFee(commision),slippageRate(slippage){
     
 }
 
@@ -79,6 +79,8 @@ bool Broker::checkOrder(Order& check){
     if(check.side == 0){
         double tempBalance = user.checkBalance();
         double currPrice;
+        //obtain the bar related to this ticker
+        Bar& currBar = currBars[check.ticker];
         //obtain the price(low) and tempBalance >= price*quantity
         if(check.type == "market"){
             currPrice = currBar.open;
@@ -171,6 +173,7 @@ bool Broker::checkOrderLimitAndStop(Order check){
     //  stop : vice versa
     //then check if either the account has sufficient funds or if they have enough shares 
     //these checks do not include the commision fee
+    Bar& currBar = currBars[check.ticker];
     if(check.type == "limit"){
         if(check.side == 0){
             if(currBar.low <= check.checkPrice){
@@ -208,6 +211,7 @@ bool Broker::checkOrderLimitAndStop(Order check){
 void Broker::processOrder(int id, Order order){
     //also needs currPrice
     //creates the trade history struct and insters it into the history var
+    Bar& currBar = currBars[order.ticker];
     double currPrice;
     Trade tempTrade;
 

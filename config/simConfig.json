@@ -1,0 +1,27 @@
+{
+  "simulation_metadata": {
+    "simulation_id": "sim_123",
+    "notes": "test"
+  },
+  "account": {
+    "initial_cash": 10000.00
+  },
+  "broker":{
+    "commission_rate": 0.001,
+    "slippage_rate": 0.0005
+  },
+  "data_feeds": [
+    {
+      "ticker": "AAPL",
+      "timeframe": "1D",
+      "csv_filepath": "../data/AAPL_1D.csv"
+    },
+  ],
+  "strategy": {
+    "name": "sma",
+    "parameters": {
+      "fast_period": 50,
+      "slow_period": 200
+    }
+  }
+}

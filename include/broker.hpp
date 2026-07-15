@@ -16,10 +16,10 @@ class Broker{
     //for the time being assume that the price will be directly inputted into the functions
     public:
         //the broker is connected to the account with no direct modifier so it can use its methods
-        //since the broker has a reference to the currBar in main.cpp, there is no need for a function to assign the bar every main iteration
-        Broker(Account& account, Bar& connectBar);
+        //since the broker has a reference to the currBars in main.cpp, there is no need for a function to assign the bar every main iteration
+        Broker(Account& account, std::unordered_map<std::string,Bar> connectBar);
 
-        Broker(Account& account, Bar& connectBar, double commision, double slippage);
+        Broker(Account& account, std::unordered_map<std::string,Bar> connectBar, double commision, double slippage);
 
         //the following three functions are to be used by the stratgey.hpp/cpp
         //the strategy will create the Order struct and send it to be processed by the Broker.
@@ -56,7 +56,7 @@ class Broker{
         //since market orders are prioritized first, they are in a seperate unordered map in order to iterate through them first for processing
         std::unordered_map<long int, Order> orders;
         std::unordered_map<long int, Trade> history;
-        Bar& currBar;
+        std::unordered_map<std::string,Bar> currBars;
 
         bool checkOrder(Order& check);
 

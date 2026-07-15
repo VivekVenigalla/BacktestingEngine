@@ -89,15 +89,14 @@ bool Account::checkPosition(std::string ticker){
     return positions.count(ticker) > 0;
 } 
 
-double Account::accountValue(const std::vector<std::string> allTickers, double currPrice){
+double Account::accountValue(std::unordered_map<std::string, double> currPrices){
     double temp = balance;
-    for(const auto& element : allTickers){
-        if(checkPosition(element)){
-            //std::cout<<"Position Quantity: "<<positionQuantity(element)<<std::endl;
-            //std::cout<<"AEP: "<<positionAEP(element)<<std::endl;
-            temp+=positionValue(element, currPrice);
+    for(const auto& [key, value] : currPrices){
+        if(checkPosition(key)){
+            temp+=positionValue(key, value);
         }
     }
+
     return temp;
 }
 

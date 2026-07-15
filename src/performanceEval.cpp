@@ -4,11 +4,11 @@ Metrics::Metrics(Account& a, std::unordered_map<long int, Trade>& tH, std::vecto
     
 }
 
-double Metrics::totalReturn(double initial, double currPrice){
+double Metrics::totalReturn(double initial, std::unordered_map<std::string, double> currPrices){
     //totalReturn = (final equity - intial equity)/initial equity * 100
     double finalEquity;
     double initialEquity = initial;
-    finalEquity = user.accountValue(allTickers, currPrice);
+    finalEquity = user.accountValue(currPrices);
     std::cout << "Initial Equity: " << initialEquity << std::endl;
     std::cout << "Final Equity: " << finalEquity << std::endl;
     return ((finalEquity-initialEquity)/initialEquity)*100.0;
@@ -17,12 +17,12 @@ double Metrics::totalReturn(double initial, double currPrice){
 
 //similar to totalReturn but accounts for the time elapsed to obtain a average annual growth rate
 //good value beats S&P 500
-double Metrics::cagr(double initial, double currPrice, int years){
+double Metrics::cagr(double initial, std::unordered_map<std::string, double> currPrices, int years){
     //cagr = ((final/initial)^(1/Y)-1)*100
     //converts to percentage
     double finalEquity;
     double initialEquity = initial;
-    finalEquity = user.accountValue(allTickers, currPrice);
+    finalEquity = user.accountValue(currPrices);
     double base = finalEquity/initialEquity;
     double exp = 1.0/years;
     return (std::pow(base, exp) - 1.0)*100.0;

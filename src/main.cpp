@@ -13,18 +13,42 @@
 #include "../include/strategies/donChannel.hpp"
 #include "../include/performanceEval.hpp"
 #include "../include/logger.hpp"
+//#include "nlohmann/json.hpp"
+
+//using namespace json = nlohmann::json;
 
 int main(){
-
+    //parse the json config file and obtain the settings for sim
+    /*std::string JSON_PATH = "../config/simConfig.json";
+    std::ifstream file(JSON_PATH);
+    json config;
+    file >> config;
+*/
     //implement stock selection here later when python csv downloader is integrated
     std::vector<std::string> tickers = {"AAPL"};
     double initBalance = 1200.0;
     
+
+    std::vector<Data> feeds;
+    //the reserve allows me to allow enough space for the tickers
+    feeds.reserve(tickers.size()); 
+
+    std::unordered_map<std::string, Bar> bars;
     
-    Data feed("AAPL");
-    Bar& bar = feed.getBar();
+    //create data feeds with csvParser
+    for(const auto& tempTicker : tickers){
+        //automatically creates an object
+        feeds.emplace_back(tempTicker); 
+    }
+
+    //create bar objects for broker and strategy
+    for(auto& feed : feeds){
+        bars[feed.ticker] = feed.getBar();
+    }
+
     Account newAccount(initBalance, tickers);
-    Broker newBroker(newAccount, bar);
+    //modify so it has commision and slippage as well
+    Broker newBroker(newAccount, bars);
     Logger logger;
     //history of orders and trades
     std::unordered_map<long int, Trade>& historyRef = newBroker.returnHistory();
@@ -32,7 +56,6 @@ int main(){
     std::unordered_map<std::string, Bar> tempBarLog;
     std::unordered_map<std::string, Position> tempPositionLog;
 
-    tempBarLog["AAPL"] = bar;
 
     //history of positions
     Metrics calculate(newAccount, historyRef, tickers);
@@ -44,32 +67,41 @@ int main(){
     std::cin >> stratType;
     std::cout << std::endl;
 
-    //strategies at this point can only use one stock in reference, integrate multiple stocks option later
-    std::unique_ptr<Strategy> strategy = StrategyFactory::create(newBroker, newAccount, bar, historyRef, "AAPL", stratType);
+    std::unique_ptr<Strategy> strategy = StrategyFactory::create(newBroker, newAccount, bars, historyRef, "AAPL", stratType);
 
     strategy->init();
-    
+    /*
     std::cout<<"Current Bar: " << bar.date << " Current Balance: " << newAccount.checkBalance() << "\n";
     feed.nextBar();
     std::cout<<"Current Bar: " << bar.date << " Current Balance: " << newAccount.checkBalance() << "\n";
-    
+    */
     //main loop
     //check if the feed has more data
-    
-    
-    while(feed.hasMoreData()){
+    std::unordered_map<std::string, double> currPrices;
+    //iterate over one feed(this simulation assumes that the feeds are identical in size)
+    while(feeds[0].hasMoreData()){
         //if the feed has more data, then first update the strategy with the data
-        bar = feed.getBar();
-        tempBarLog["AAPL"] = bar;
+        for(auto& tempFeed : feeds){
+            bars[tempFeed.ticker] = tempFeed.getBar();
+            tempBarLog[tempFeed.ticker] = bars[tempFeed.ticker];
+            //the account alue will use the close value of the bar
+            currPrices[tempFeed.ticker] = bars[tempFeed.ticker].close;
+        }
+        //check this one
         newBroker.checkLoop();
+        //loadBar is overwritten if the strategy required multiple tickers
         strategy->loadBar();
         strategy->runBar();
-        std::cout<<"Current Bar: " << bar.date << " Current Balance: " << newAccount.checkBalance() << "\n";
-        feed.nextBar();
+        std::cout<<"Current Date: " << bars.begin()->second.date << " Current Balance: " << newAccount.checkBalance() << "\n";
+
 
         //load snapshot
-        logger.logSnapshot(bar.date, tempBarLog, newAccount.checkBalance(), newAccount.accountValue(tickers, bar.close), newAccount.returnPositions());
+        logger.logSnapshot(bars[feeds[0].ticker].date, tempBarLog, newAccount.checkBalance(), newAccount.accountValue(currPrices), newAccount.returnPositions());
         
+        //next bar for all tickers
+        for(auto& tempFeed : feeds){
+            tempFeed.nextBar();
+        }
     }
     //full history of trades that were executed
     //iterate over the historyRef
@@ -82,8 +114,8 @@ int main(){
     }
     
     //metrics
-    double returns = calculate.totalReturn(initBalance, bar.close);
-    double cagr = calculate.cagr(initBalance, bar.close, 10);
+    double returns = calculate.totalReturn(initBalance, currPrices);
+    double cagr = calculate.cagr(initBalance, currPrices, 10);
     
     std::cout<<"Total return: " << returns << std::endl;
     std::cout<<"CAGR: " << cagr << std::endl;

@@ -11,6 +11,7 @@ class Parser{
         //previous implementation => std::vector<Bar> parse();
         std::map<std::string, Bar> parse(std::string ticker);
         std::map<std::string, Bar> parse();
+        
     private:
         //data path to the only file in this folder for now
         std::string DATA_PATH = "../data/AAPL_1d.csv";

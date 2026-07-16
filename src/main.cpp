@@ -24,12 +24,18 @@ int main(){
     std::ifstream file(JSON_PATH);
     json config;
     file >> config;
-    //implement stock selection here later when python csv downloader is integrated
 
-    std::vector<std::string> tickers = {"AAPL"};
+    //transfer config data from simConfig.json
+    std::vector<std::string> tickers;
     double initBalance = config["account"]["initial_balance"].get<double>();
+    std::cout << initBalance << std::endl;
+    double commission = config["broker"]["commission_rate"].get<double>();
+    double slippage = config["broker"]["slippage_rate"].get<double>();
+    //iterate over the dataFeed object
+    for(auto& feed: config["data_feeds"]){
+        tickers.push_back(feed["ticker"].get<std::string>());
+    }
     
-
     std::vector<Data> feeds;
     //the reserve allows me to allow enough space for the tickers
     feeds.reserve(tickers.size()); 
@@ -49,13 +55,12 @@ int main(){
 
     Account newAccount(initBalance, tickers);
     //modify so it has commision and slippage as well
-    Broker newBroker(newAccount, bars, 1.0, 0.0005);
+    Broker newBroker(newAccount, bars, commission, slippage);
     Logger logger;
     //history of orders and trades
     std::unordered_map<long int, Trade>& historyRef = newBroker.returnHistory();
     std::unordered_map<long int, Order>& orderRef = newBroker.returnOrders();
     std::unordered_map<std::string, Bar> tempBarLog;
-    std::unordered_map<std::string, Position> tempPositionLog;
 
 
     //history of positions

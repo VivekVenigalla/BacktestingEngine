@@ -25,7 +25,7 @@ Account::Account(double initBalance, bool initPos){
     }
 }
 
-Account::Account(double initBalance, std::vector<std::string> tickers){
+Account::Account(double initBalance, std::vector<std::string> tickers, std::string ID) : id(ID){
     balance = initBalance;
     for(int i = 0; i < tickers.size(); i++){
         buyNewPosition(tickers[i], 0, 0.0);
@@ -41,6 +41,10 @@ double Account::checkBalance(){
 
 void Account::modifyBalance(double modifier){
     balance += modifier;
+}
+
+void Account::setBalance(double newbalance){
+    balance = newbalance;
 }
 
 //creating positions, deleting, and modifiying

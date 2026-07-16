@@ -9,7 +9,7 @@ Broker::Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar
     //no additional construction needed for now, since user and currBar is already referenced
 }
 
-Broker::Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar, double commision, double slippage) :user(account),currBars(connectBar),commisionFee(commision),slippageRate(slippage){
+Broker::Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar, double commision, double slippage, std::string ID) :user(account),currBars(connectBar),commisionFee(commision),slippageRate(slippage),id(ID){
     
 }
 

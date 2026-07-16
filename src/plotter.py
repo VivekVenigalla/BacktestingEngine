@@ -2,8 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 #load the csv file
-path = "/Users/vivekvenigalla/Documents/VV_Active/03_PROJECTS/BacktestingEngine/data/results_sma_AAPL_1D_1.csv"
-loader = pd.read_csv("/Users/vivekvenigalla/Documents/VV_Active/03_PROJECTS/BacktestingEngine/data/results_sma_AAPL_1D_1.csv")
+path = "/Users/vivekvenigalla/Documents/VV_Active/03_PROJECTS/BacktestingEngine/data/results_boll_AAPL_1D_1.csv"
+loader = pd.read_csv(path)
 
 #create a new collumn timestamp that converts the date string into a datetime object 
 loader["Timestamp"] = pd.to_datetime(loader['Date'])

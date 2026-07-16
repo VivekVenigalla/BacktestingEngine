@@ -19,7 +19,7 @@ class Broker{
         //since the broker has a reference to the currBars in main.cpp, there is no need for a function to assign the bar every main iteration
         Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar);
 
-        Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar, double commision, double slippage);
+        Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar, double commision, double slippage, std::string ID);
 
         //the following three functions are to be used by the stratgey.hpp/cpp
         //the strategy will create the Order struct and send it to be processed by the Broker.

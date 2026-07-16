@@ -82,7 +82,7 @@ int main() {
         //acctID is used to link the accounts with the broker and strategy
         std::string acctID = account["id"].get<std::string>();
         //create the account with the emplace function
-        allAccounts.emplace(acctID, Account{account["initial_balance"].get<double>(), tempTickers});
+        allAccounts.emplace(acctID, Account{account["initial_balance"].get<double>(), tempTickers, acctID});
     }
 
     //create the brokers
@@ -97,7 +97,8 @@ int main() {
             allAccounts.at(acctLink), 
             bars, 
             broker["commission_rate"].get<double>(), 
-            broker["slippage_rate"].get<double>()
+            broker["slippage_rate"].get<double>(),
+            brokerID
         ));
     }
 
@@ -195,7 +196,8 @@ int main() {
 
         }
         std::cout << "Simulation [" << simID << "] finished" << "\n";
-
+        std::cout << "Account ID: " << tempAccount.id << "\n";
+        std::cout << "Broker ID: " << tempBroker.id << "\n";
         //create the metric report
         returns = calculator.totalReturn(initBalance, currPrices);
         //obtain the timeframe distance for cagr in the configs.json
@@ -209,7 +211,10 @@ int main() {
         std::string filename = "../data/results_" + simID + ".csv";
         tempLogger.exportCSV(filename);
         std::cout << "Exported results to " << filename << std::endl;
+
     }
+
+
     //finish :)
     std::cout << "\nSimulations finished successfully." << std::endl;
     return 0;

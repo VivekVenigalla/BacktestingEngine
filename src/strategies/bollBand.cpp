@@ -5,7 +5,8 @@
 
 bollBand::bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol) : Strategy(b, u, cBs, history, symbol){
 }
-
+bollBand::bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window) : Strategy(b, u, cBs, history, symbol), windowSize(window){
+}
 
 void bollBand::init(){
     std::cout << "Created a Bollinger Band(Mean Reversion) Strategy" << std::endl;

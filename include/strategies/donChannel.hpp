@@ -12,7 +12,7 @@
 class donChannel : public Strategy{
     public:
         donChannel(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol);
-        
+        donChannel(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window);        
         void runBar();
         void init();
         virtual ~donChannel() = default;

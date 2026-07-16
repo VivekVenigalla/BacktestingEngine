@@ -5,7 +5,8 @@
 
 donChannel::donChannel(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol) : Strategy(b, u, cBs, history, symbol){
 }
-
+donChannel::donChannel(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window) : Strategy(b, u, cBs, history, symbol), windowSize(window){
+}
 
 void donChannel::init(){
     std::cout << "Created a Donchian Channel(Breakout) Strategy" << std::endl;

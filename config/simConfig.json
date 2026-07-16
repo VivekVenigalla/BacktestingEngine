@@ -7,6 +7,14 @@
     {
     "id":"basicAccount",
     "initial_balance":10000
+    },
+    {
+    "id":"bollAccount",
+    "initial_balance":10000
+    },
+    {
+    "id":"donAccount",
+    "initial_balance":10000
     }
   ],
   "broker":[
@@ -15,6 +23,18 @@
     "commission_rate": 1,
     "slippage_rate": 0.0005,
     "account_link":"basicAccount"
+    },
+    {
+    "id":"bollBroker",
+    "commission_rate": 1,
+    "slippage_rate": 0.0005,
+    "account_link":"bollAccount"
+    },
+    {
+    "id":"donBroker",
+    "commission_rate": 1,
+    "slippage_rate": 0.0005,
+    "account_link":"donAccount"
     }
   ],
   "data_feeds": [
@@ -38,6 +58,30 @@
       ],
       "account_link":"basicAccount",
       "broker_link":"basicBroker"
+    },
+    {
+      "id":"boll_AAPL_1D_1",
+      "strategy": "boll",
+      "parameters": {
+        "window" :20
+      },
+      "feeds":[
+        "AAPL_1D_1"
+      ],
+      "account_link":"bollAccount",
+      "broker_link":"bollBroker"
+    },
+    {
+      "id":"don_AAPL_1D_1",
+      "strategy": "don",
+      "parameters": {
+        "window" :20
+      },
+      "feeds":[
+        "AAPL_1D_1"
+      ],
+      "account_link":"donAccount",
+      "broker_link":"donBroker"
     }
 
   ]

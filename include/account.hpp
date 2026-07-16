@@ -17,12 +17,12 @@ class Account{
 
         Account(double initBalance, bool initPos);
 
-        Account(double initBalance, std::vector<std::string> tickers);
+        Account(double initBalance, std::vector<std::string> tickers, std::string ID);
 
         //helper functions
         double checkBalance();
         void modifyBalance(double modifier);
-
+        void setBalance(double newbalance);
         void buyNewPosition(std::string ticker, long quantity, double entryPrice);
         void buyPositionQuantity(std::string ticker, long quantityChange, double entryPrice);
         void sellPositionQuantity(std::string ticker, long quantityChange, double entryPrice);
@@ -37,6 +37,7 @@ class Account{
         //double checkTotalEquity();
         
         std::unordered_map<std::string, Position> returnPositions();
+        std::string id;
 
     private:
         double balance = 10000.0;

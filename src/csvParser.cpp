@@ -6,14 +6,14 @@
 
 
 
-std::map<std::string, Bar> Parser::parse(std::string tickertemp){
+std::map<std::string, Bar> Parser::parse(std::string ticker, std::string path){
     
     //declare variables
     std::string row;
     std::map<std::string, Bar> data;
     //access the csv file for read only
     //to read and writ use fstream
-    std::ifstream file(DATA_PATH);
+    std::ifstream file(path);
 
     //check if the file was accessed or not
     if(!file.is_open()){
@@ -52,7 +52,7 @@ std::map<std::string, Bar> Parser::parse(std::string tickertemp){
         std::getline(ss, close_temp, ',' );
         std::getline(ss, volume_temp, ',' );
 
-        newBar.ticker = tickertemp;
+        newBar.ticker = ticker;
         newBar.date = date_temp;
         newBar.open = std::stod(open_temp);
         newBar.high = std::stod(high_temp);

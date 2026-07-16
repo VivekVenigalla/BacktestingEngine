@@ -41,7 +41,7 @@ class Broker{
         std::unordered_map<long int, Trade>& returnHistory();
         std::unordered_map<long int, Order>& returnOrders();
         
-        
+        std::string id;
     private:
 
         //need a vector of orders that will be accessed by the Broker every Bar to execute limit or market

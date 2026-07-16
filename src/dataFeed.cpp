@@ -5,8 +5,8 @@ Data::Data(){
     currBar = data.begin();
 }
 
-Data::Data(std::string tick) : ticker(tick){
-    data = parser.parse(tick);
+Data::Data(std::string id, std::string tick, std::string path) : ticker(tick), ID(id), PATH(path){
+    data = parser.parse(id, path);
     currBar = data.begin();
 }
 

@@ -3,25 +3,42 @@
     "simulation_id": "sim_123",
     "notes": "test"
   },
-  "account": {
-    "initial_balance": 10000.00
-  },
-  "broker":{
+  "account":[
+    {
+    "id":"basicAccount",
+    "initial_balance":10000
+    }
+  ],
+  "broker":[
+    {
+    "id":"basicBroker",
     "commission_rate": 1,
-    "slippage_rate": 0.0005
-  },
+    "slippage_rate": 0.0005,
+    "account_link":"basicAccount"
+    }
+  ],
   "data_feeds": [
     {
+      "id":"AAPL_1D_1",
       "ticker": "AAPL",
       "timeframe": "1D",
       "csv_filepath": "../data/AAPL_1D.csv"
     }
   ],
-  "strategy": {
-    "name": "sma",
-    "parameters": {
-      "fast_period": 50,
-      "slow_period": 200
+  "simulations": [
+    {
+      "id":"sma_AAPL_1D_1",
+      "strategy": "sma",
+      "parameters": {
+        "fast_period": 50,
+        "slow_period": 200
+      },
+      "feeds":[
+        "AAPL_1D_1"
+      ],
+      "account_link":"basicAccount",
+      "broker_link":"basicBroker"
     }
-  }
+
+  ]
 }

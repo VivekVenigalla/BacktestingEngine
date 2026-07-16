@@ -9,7 +9,7 @@ class Parser{
         //open the file
         //loop through the contents(making sure to skip the first row)
         //previous implementation => std::vector<Bar> parse();
-        std::map<std::string, Bar> parse(std::string ticker);
+        std::map<std::string, Bar> parse(std::string ticker, std::string path);
         std::map<std::string, Bar> parse();
         
     private:

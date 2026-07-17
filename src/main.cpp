@@ -122,7 +122,7 @@ int main() {
         std::string stratType = sim["strategy"].get<std::string>();
         std::string acctLink = sim["account_link"].get<std::string>();
         std::string brokerLink = sim["broker_link"].get<std::string>();
-        bool runAll = sim.value("run_all_by_default", true);
+        bool runAll = sim.value<bool>("run_all_by_default", true);
 
 
         //.at() bypasses standard constructor requirements which gives an error
@@ -184,7 +184,7 @@ int main() {
         }
         else{
             std::string command;
-            while(runner.getIsFinished()){
+            while(!runner.getIsFinished()){
                 std::cout << "Controls: 's'=Step, 'n'=N Steps, 'd'=Run To Date, 'r'=Run All, 'q'=Skip -> Option: ";
                 std::cin >> command;
                 //get the command and check based on the controls

@@ -100,7 +100,6 @@ double Account::accountValue(std::unordered_map<std::string, double> currPrices)
             temp+=positionValue(key, value);
         }
     }
-
     return temp;
 }
 

@@ -181,6 +181,7 @@ int main() {
             strategy->runBar();
             
             double value = tempAccount.accountValue(currPrices);
+            std::cout << value << " right \n";
             //command line log for debugging purposes
             std::cout << "Sim[" << simID << "] Date: " << tempBars[primaryID].date 
                       << " | Balance: " << tempAccount.checkBalance() << "| Total Equity: " << value << "\n";

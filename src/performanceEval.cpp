@@ -31,7 +31,6 @@ double Metrics::cagr(double initial, std::unordered_map<std::string, double> cur
 //calculates the drawdown from the highest value reached to the current value of all assets
 double Metrics::drawDown(std::unordered_map<std::string, double> currPrices){
     double current = user.accountValue(currPrices);
-
     if(current > peakValue){
         peakValue = current;
     }

@@ -55,7 +55,7 @@
         "slow_period": 200
       },
       "feeds":[
-        "AAPL_1D_1"
+        "AAPL_1D"
       ],
       "account_link":"basicAccount",
       "broker_link":"basicBroker"
@@ -67,7 +67,7 @@
         "window" :20
       },
       "feeds":[
-        "AAPL_1D_1"
+        "AAPL_1D"
       ],
       "account_link":"bollAccount",
       "broker_link":"bollBroker"
@@ -79,7 +79,7 @@
         "window" :20
       },
       "feeds":[
-        "AAPL_1D_1"
+        "AAPL_1D"
       ],
       "account_link":"donAccount",
       "broker_link":"donBroker"

@@ -4,3 +4,4 @@ yf_env/
 .vscode/
 data/
 plot_results/
+output/

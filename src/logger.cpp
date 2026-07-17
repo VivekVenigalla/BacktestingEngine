@@ -171,6 +171,7 @@ void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_
     while(fs::exists(targetFolder)){
         uniqueID = simID + "_" + std::to_string(counter);
         targetFolder = baseDir / uniqueID;
+        counter++;
     }
     //when the while loop breaks the folder path is now unique
 

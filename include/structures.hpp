@@ -64,6 +64,7 @@ struct History{
     std::vector<std::unordered_map<std::string, Bar>> bars;
     std::vector<double> balances;
     std::vector<double> totalEquity;
+    std::vector<double> drawDown;
     std::vector<std::unordered_map<std::string, Position>> positions;
     //uses the lookup map in the logger
     void print_with_date(int index) const;
@@ -81,7 +82,7 @@ struct Trade{
     std::string ticker;
     double execPrice;
     std::string type;
-    bool side;
+    int side;
     long quantity;
     double checkPrice;
     //figure out the commmision calculation

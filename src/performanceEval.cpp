@@ -27,3 +27,28 @@ double Metrics::cagr(double initial, std::unordered_map<std::string, double> cur
     double exp = 1.0/years;
     return (std::pow(base, exp) - 1.0)*100.0;
 }
+
+//calculates the drawdown from the highest value reached to the current value of all assets
+double Metrics::drawDown(std::unordered_map<std::string, double> currPrices){
+    double current = user.accountValue(currPrices);
+
+    if(current > peakValue){
+        peakValue = current;
+    }
+
+    //calculate drawdown
+    return (current - peakValue)/peakValue * 100.0;
+
+}
+
+//overloaded if the value is already calculated
+double Metrics::drawDown(double value){
+    
+    if(value > peakValue){
+        peakValue = value;
+    }
+
+    //calculate drawdown
+    return (value - peakValue)/peakValue * 100.0;
+
+}

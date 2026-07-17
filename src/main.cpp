@@ -137,7 +137,6 @@ int main() {
         //get the important feeds and bars
         std::unordered_map<std::string, Bar> tempBars;
         std::vector<std::string> feedIDs;
-        
         for (auto& feed : sim["feeds"]) {
             std::string feedID = feed.get<std::string>();
             feedIDs.push_back(feedID);
@@ -162,6 +161,12 @@ int main() {
 
         std::unordered_map<std::string, double> currPrices;
         std::string primaryID = feedIDs[0];
+
+        //obtain cgar length
+        json primaryFeedConfig = config.contains("data_feeds") ? config["data_feeds"][0] : json::object();
+
+        double cagrLength = primaryFeedConfig["cagr_length"];
+
         //run simulation
         while (feeds[primaryID].hasMoreData()) {
             for (const std::string& id : feedIDs) {
@@ -186,7 +191,8 @@ int main() {
                 tempBars, 
                 tempAccount.checkBalance(), 
                 value, 
-                tempAccount.returnPositions()
+                tempAccount.returnPositions(),
+                calculator.drawDown(value)
             );
             
             //iterate to the next bar for all used feeds
@@ -199,19 +205,21 @@ int main() {
         std::cout << "Account ID: " << tempAccount.id << "\n";
         std::cout << "Broker ID: " << tempBroker.id << "\n";
         //create the metric report
+        /*
         returns = calculator.totalReturn(initBalance, currPrices);
         //obtain the timeframe distance for cagr in the configs.json
         cagr = calculator.cagr(initBalance, currPrices, 10);
-
+        //tempLogger.printAllSnapshots();
         std::cout << "Returns: " << returns << "\n";
         std::cout << "CAGR: " << cagr << "\n";
-
 
         //export individual csvs for each simulation
         std::string filename = "../data/results_" + simID + ".csv";
         tempLogger.exportCSV(filename);
         std::cout << "Exported results to " << filename << std::endl;
+        */
 
+        tempLogger.exportData(simID, calculator, historyRef, currPrices, initBalance, cagrLength);
     }
 
 

@@ -1,6 +1,6 @@
 #include "../include/broker.hpp"
 #include <iostream>
-
+#include <algorithm>
 
 //WORK IN PROGRESS
 //FIX create order and process order, while building method and means for obtaining the data values.
@@ -136,8 +136,11 @@ void Broker::checkLoop(){
                 it = orders.erase(it);
                 continue;   
             }
-            //passed required price but lack of funds or shares so order is nulled
+            //passed required price but lack of funds or shares so order is still held
             else{
+                //even if there are no funds or shares available, dont cancel the order unless the strategy says so
+                ++it;
+                /*
                 int id = it->first;
                 Order order = it->second;
                 Trade tempTrade;
@@ -152,7 +155,7 @@ void Broker::checkLoop(){
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
                 history[it->first] = tempTrade;
                 it = orders.erase(it); 
-                continue;
+                continue;*/
             }
         }
         else{
@@ -229,19 +232,20 @@ void Broker::processOrder(int id, Order order){
     }
     else if(order.type == "limit"){
         if(order.side ==0){
-            currPrice = (order.checkPrice)*(1.0+slippageRate)+commisionFee;  
+            //execute the better price between the open and checkPrice
+            currPrice = (std::min(order.checkPrice, currBar.open))*(1.0+slippageRate)+commisionFee;  
         }
         else{
-            currPrice = (order.checkPrice)*(1.0-slippageRate)-commisionFee;   
+            currPrice = (std::max(order.checkPrice, currBar.open))*(1.0-slippageRate)-commisionFee;   
         }
         tempTrade.execPrice = currPrice; 
     }
     else{
         if(order.side ==0){
-            currPrice = (currBar.close)*(1.0+slippageRate)+commisionFee;  
+            currPrice = (std::max(order.checkPrice, currBar.open))*(1.0+slippageRate)+commisionFee;  
         }
         else{
-            currPrice = (currBar.close)*(1.0-slippageRate)-commisionFee; 
+            currPrice = (std::min(order.checkPrice, currBar.open))*(1.0-slippageRate)-commisionFee; 
         }
     }
 

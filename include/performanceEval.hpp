@@ -1,3 +1,4 @@
+#pragma once
 #include "./account.hpp"
 #include "./structures.hpp"
 #include "./broker.hpp"
@@ -13,10 +14,13 @@ class Metrics{
         //returns the total return from the initial balance to all position value
         double totalReturn(double initial, std::unordered_map<std::string, double> currPrices);
         double cagr(double initial, std::unordered_map<std::string, double> currPrices, int years);
+        double drawDown(std::unordered_map<std::string, double> currPrices);
+        double drawDown(double value);
 
     private:
         Account& user;
         std::unordered_map<long int, Trade>& tradeHistory;
         std::vector<std::string> allTickers;
+        double peakValue = 0.0;
 
 };

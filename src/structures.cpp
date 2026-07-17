@@ -42,6 +42,7 @@ void History::print_with_date(int index) const{
 
     std::cout<<"Balance: " << balances[index] << std::endl;
     std::cout<<"Total Equity: " << totalEquity[index] << std::endl;
+    std::cout<<"Draw Down: " << drawDown[index] << std::endl;
 
     std::unordered_map<std::string, Position> tempPos = positions[index];
     for(const auto& [key, value] : tempPos){

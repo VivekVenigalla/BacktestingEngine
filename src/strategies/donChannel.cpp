@@ -16,12 +16,6 @@ void donChannel::runBar(){
     
     double currPrice = connectBars.begin()->second.close;
     
-
-    Window.push_back(currPrice);
-
-    
-    
-
     //if both windows are filled then execute breakout logic
     if(Window.size() == windowSize){
 
@@ -48,5 +42,13 @@ void donChannel::runBar(){
         
 
     }
+    
+    Window.push_back(currPrice);
+
+    if(Window.size() > windowSize){
+        Window.erase(Window.begin());
+    }
+    
+
     
 }

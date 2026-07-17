@@ -12,6 +12,7 @@
 #include "../include/strategies/bollBand.hpp"
 #include "../include/strategies/donChannel.hpp"
 #include "../include/performanceEval.hpp"
+#include "../include/simulationRunner.hpp"
 #include "../include/logger.hpp"
 #include "nlohmann/json.hpp"
 
@@ -121,6 +122,7 @@ int main() {
         std::string stratType = sim["strategy"].get<std::string>();
         std::string acctLink = sim["account_link"].get<std::string>();
         std::string brokerLink = sim["broker_link"].get<std::string>();
+        bool runAll = sim.value("run_all_by_default", true);
 
 
         //.at() bypasses standard constructor requirements which gives an error
@@ -167,6 +169,54 @@ int main() {
 
         double cagrLength = primaryFeedConfig["cagr_length"];
 
+        //size_t is a storage method for the size of objects
+        size_t totalHistoricalBarsCount = feeds[primaryID].totalBars(); 
+
+        //create runner obect
+        SimulationRunner runner(
+            simID, tempAccount, tempBroker, strategy, tempLogger, calculator,
+            feeds, bars, tempBars, currPrices, feedIDs, initBalance, cagrLength, totalHistoricalBarsCount
+        );
+
+        //if config says so run the entire simulation
+        if(runAll){
+            runner.runAll();
+        }
+        else{
+            std::string command;
+            while(runner.getIsFinished()){
+                std::cout << "Controls: 's'=Step, 'n'=N Steps, 'd'=Run To Date, 'r'=Run All, 'q'=Skip -> Option: ";
+                std::cin >> command;
+                //get the command and check based on the controls
+                if(command == "s") {
+                    runner.step();
+                } 
+                else if(command == "n") {
+                    size_t stepsCount;
+                    std::cout << "Enter number of bars to process: ";
+                    std::cin >> stepsCount;
+                    runner.runSteps(stepsCount);
+                } 
+                else if(command == "d") {
+                    std::string targetDateString;
+                    std::cout << "Enter target window limit string (YYYY-MM-DD): ";
+                    std::cin >> targetDateString;
+                    runner.runToDate(targetDateString);
+                } 
+                else if(command == "r") {
+                    runner.runAll();
+                } 
+                else if(command == "q") {
+                    break;
+                }
+                else{
+                    std::cout << "Invalid input. Please try again" << "\n";
+                }
+            }
+        
+
+        }
+        /*
         //run simulation
         while (feeds[primaryID].hasMoreData()) {
             for (const std::string& id : feedIDs) {
@@ -206,7 +256,7 @@ int main() {
         std::cout << "Account ID: " << tempAccount.id << "\n";
         std::cout << "Broker ID: " << tempBroker.id << "\n";
         //create the metric report
-        /*
+        
         returns = calculator.totalReturn(initBalance, currPrices);
         //obtain the timeframe distance for cagr in the configs.json
         cagr = calculator.cagr(initBalance, currPrices, 10);
@@ -218,9 +268,9 @@ int main() {
         std::string filename = "../data/results_" + simID + ".csv";
         tempLogger.exportCSV(filename);
         std::cout << "Exported results to " << filename << std::endl;
-        */
+        
 
-        tempLogger.exportData(simID, calculator, historyRef, currPrices, initBalance, cagrLength);
+        tempLogger.exportData(simID, calculator, historyRef, currPrices, initBalance, cagrLength);*/
     }
 
 

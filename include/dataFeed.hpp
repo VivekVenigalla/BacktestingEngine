@@ -10,6 +10,7 @@ class Data{
         void nextBar();
         Bar& getBar();
         bool hasMoreData();
+        size_t totalBars() const {return data.size();}
         void reset();
         std::string ticker;
         std::string ID;

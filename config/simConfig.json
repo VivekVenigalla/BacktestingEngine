@@ -58,7 +58,8 @@
         "AAPL_1D"
       ],
       "account_link":"basicAccount",
-      "broker_link":"basicBroker"
+      "broker_link":"basicBroker",
+      "run_by_default":false
     },
     {
       "id":"boll_AAPL_1D_1",
@@ -70,7 +71,8 @@
         "AAPL_1D"
       ],
       "account_link":"bollAccount",
-      "broker_link":"bollBroker"
+      "broker_link":"bollBroker",
+      "run_by_default":false
     },
     {
       "id":"don_AAPL_1D_1",
@@ -82,7 +84,8 @@
         "AAPL_1D"
       ],
       "account_link":"donAccount",
-      "broker_link":"donBroker"
+      "broker_link":"donBroker",
+      "run_by_default":false
     }
 
   ]

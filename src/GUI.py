@@ -28,6 +28,8 @@ def on_feed_drop(sender, app_data, user_data):
     dpg.set_value("strat_input_feeds_link", new_val)
 
 
+
+
 # --- UI Pipeline Action Handlers ---
 def add_sim_to_batch_callback():
     sim_id = dpg.get_value("strat_input_id")
@@ -38,6 +40,8 @@ def add_sim_to_batch_callback():
     
     print(f"Adding to Batch Queue -> Sim: {sim_id} using {strat_type}")
     
+
+
     with dpg.table_row(parent="batch_queue_table"):
         dpg.add_text(sim_id)
         dpg.add_text(strat_type)
@@ -167,6 +171,7 @@ with dpg.window(label="Simulation Analytics", tag="results_window", no_move=True
         with dpg.child_window(width=280, height=630, label="Runs Selector Index Panel"):
             dpg.add_text("Completed Run Targets", color=[255, 200, 100])
             dpg.add_separator()
+            #select from current list
             dpg.add_selectable(label="📊 Sim_Donchian_AAPL (Active)", default_value=True)
             dpg.add_selectable(label="📊 Sim_SMACross_MSFT")
             

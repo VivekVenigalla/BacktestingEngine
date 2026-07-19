@@ -15,7 +15,8 @@ SimulationRunner::SimulationRunner(const std::string& id,
 									const std::vector<std::string>& ids,
 									double balance,
 									double length,
-									size_t maxBars)
+									size_t maxBars,
+									std::string batchID)
 
 									: simID(id),
 									tempAccount(accountRef),
@@ -32,13 +33,17 @@ SimulationRunner::SimulationRunner(const std::string& id,
 									cagrLength(length),
 									currentStep(0),
 									totalSteps(maxBars),
-									isFinished(false){
+									isFinished(false),
+									batch(batchID){
+
 		primaryID = feedIDs[0];
 
 		//data check in case already ran through without resetting
 		if (!feeds[primaryID].hasMoreData()){
 			isFinished = true;
 		}
+
+
 }
 
 void SimulationRunner::step(){
@@ -83,7 +88,7 @@ void SimulationRunner::step(){
 	    std::cout << "Simulation [" << simID << "] finished" << "\n";
 	    std::cout << "Account ID: " << tempAccount.id << "\n";
 	    std::cout << "Broker ID: " << tempBroker.id << "\n";
-	    tempLogger.exportData(simID, calculator, tempBroker.returnHistory(), currPrices, initBalance, cagrLength);
+	    tempLogger.exportData(simID, calculator, tempBroker.returnHistory(), currPrices, initBalance, cagrLength, batch);
     }
 }
 

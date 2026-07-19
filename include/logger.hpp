@@ -12,7 +12,7 @@ class Logger{
 
         void logSnapshot(std::string date, std::unordered_map<std::string, Bar> bar, double balance, double equity, std::unordered_map<std::string, Position> positions, double drawdown);
     //exports all data in a folder with two csv files(bar and trade history) and 1 json file(metrics data)
-        void exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength);
+        void exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::string batchID);
         
         void exportCSV(fs::path filepath, std::string filename);
         

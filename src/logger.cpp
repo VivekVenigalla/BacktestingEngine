@@ -156,10 +156,11 @@ void Logger::exportCSVTrade(fs::path filepath, std::string filename, std::unorde
     }
 }
 
-void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength){
+void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::string batchID){
 
     //path to the output folder
     fs::path baseDir = fs::path("/Users/vivekvenigalla/Documents/VV_Active/03_PROJECTS/BacktestingEngine/output");
+    baseDir = baseDir / batchID;
     
     //this is a temporary path with the simID
     fs::path targetFolder = baseDir / simID;

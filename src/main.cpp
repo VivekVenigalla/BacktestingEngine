@@ -15,6 +15,9 @@
 #include "../include/simulationRunner.hpp"
 #include "../include/logger.hpp"
 #include "nlohmann/json.hpp"
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 //namspace of json instead of nlohmann::json for easy use
 using json = nlohmann::json;
@@ -36,6 +39,9 @@ int main() {
     //create json object and move the file to the json object allowing for parsing
     json config;
     file >> config;
+
+    //obtain batch id
+    std::string batchID = config["simulation_metadata"]["batch_id"].get<std::string>();
 
     //tickers and paths for the feed objects
 
@@ -115,6 +121,13 @@ int main() {
     double returns;
     double cagr;
 
+    //create batch output directory
+    fs::path base_dir = fs::path("/Users/vivekvenigalla/Documents/VV_Active/03_PROJECTS/BacktestingEngine/output");
+    base_dir = base_dir / batchID;
+    if(fs::create_directory(base_dir)){
+        std::cout<<"Batch output directory created at: " << base_dir << std::endl;
+    }
+
     //core loop
     for (auto& sim : config["simulations"]) {
         //get important variables here
@@ -175,7 +188,7 @@ int main() {
         //create runner obect
         SimulationRunner runner(
             simID, tempAccount, tempBroker, strategy, tempLogger, calculator,
-            feeds, bars, tempBars, currPrices, feedIDs, initBalance, cagrLength, totalHistoricalBarsCount
+            feeds, bars, tempBars, currPrices, feedIDs, initBalance, cagrLength, totalHistoricalBarsCount, batchID
         );
 
         //if config says so run the entire simulation

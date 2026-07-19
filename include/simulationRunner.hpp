@@ -29,7 +29,8 @@ class SimulationRunner {
 			const std::vector<std::string>& activeFeedIDs,
 			double initialBalance,
 			double cagrLen,
-			size_t maxBars);
+			size_t maxBars,
+			std::string batchID);
 
 		void step();
 		void runSteps(size_t n);
@@ -48,7 +49,7 @@ class SimulationRunner {
 	    std::unique_ptr<Strategy>& strategy;
 	    Logger& tempLogger;
 	    Metrics& calculator;
-
+	    std::string batch;
 	    //data holders
 	    std::unordered_map<std::string, Data>& feeds;
 	    std::unordered_map<std::string, Bar>& bars;

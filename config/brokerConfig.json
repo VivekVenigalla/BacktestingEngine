@@ -1,0 +1,25 @@
+{
+	"broker":[
+    {
+    "id":"basicBroker",
+    "commission_rate": 1,
+    "slippage_rate": 0.0005,
+    "account_link":"basicAccount",
+    "reset":true
+    },
+    {
+    "id":"bollBroker",
+    "commission_rate": 1,
+    "slippage_rate": 0.0005,
+    "account_link":"bollAccount",
+    "reset":true
+    },
+    {
+    "id":"donBroker",
+    "commission_rate": 1,
+    "slippage_rate": 0.0005,
+    "account_link":"donAccount",
+    "reset":true
+    }
+  ]
+}

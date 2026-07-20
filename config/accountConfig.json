@@ -1,0 +1,16 @@
+{
+    "account":[
+        {
+        "id":"basicAccount",
+        "initial_balance":10000
+        },
+        {
+        "id":"bollAccount",
+        "initial_balance":10000
+        },
+        {
+        "id":"donAccount",
+        "initial_balance":10000
+        }
+    ]
+}

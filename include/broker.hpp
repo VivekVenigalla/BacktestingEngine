@@ -36,7 +36,7 @@ class Broker{
         //main functions to be used by central governing script
         void checkLoop();
         
-
+        void reset();
         //getter methods
         std::unordered_map<long int, Trade>& returnHistory();
         std::unordered_map<long int, Order>& returnOrders();

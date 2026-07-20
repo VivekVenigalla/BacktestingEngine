@@ -27,6 +27,7 @@ Account::Account(double initBalance, bool initPos){
 
 Account::Account(double initBalance, std::vector<std::string> tickers, std::string ID) : id(ID){
     balance = initBalance;
+    initial = initBalance;
     for(int i = 0; i < tickers.size(); i++){
         buyNewPosition(tickers[i], 0, 0.0);
     }
@@ -92,6 +93,13 @@ double Account::positionValue(std::string ticker, double currPrice){
 bool Account::checkPosition(std::string ticker){
     return positions.count(ticker) > 0;
 } 
+
+void Account::reset(){
+    for(auto& [key, value] : positions){
+        value.quantity = 0;
+    }
+    balance = initial;
+}
 
 double Account::accountValue(std::unordered_map<std::string, double> currPrices){
     double temp = balance;

@@ -27,7 +27,7 @@ using json = nlohmann::json;
 int main() {
     
     //JSON_PATH will be altered when connected to the GUI
-    std::string JSON_PATH = "../config/simConfig.json";
+    std::string JSON_PATH = "../config/batchConfig/batch_123.json";
     //connect to the file
     std::ifstream file(JSON_PATH);
 
@@ -137,6 +137,25 @@ int main() {
         std::string brokerLink = sim["broker_link"].get<std::string>();
         bool runAll = sim.value<bool>("run_all_by_default", true);
 
+        json accountConfig;
+        json brokerConfig;
+        for (const auto& acc : config["account"]) {
+            if (acc.contains("id") && acc["id"] == acctLink) {
+                accountConfig = acc;
+                break; 
+            }
+        }
+
+        for (const auto& bro : config["broker"]) {
+            if (bro.contains("id") && bro["id"] == brokerLink) {
+                brokerConfig = bro;
+                break; 
+            }
+        }
+
+
+        bool accountReset = accountConfig.value<bool>("reset", true);
+        bool brokerReset = brokerConfig.value<bool>("reset", true);
 
         //.at() bypasses standard constructor requirements which gives an error
         Account& tempAccount = allAccounts.at(sim["account_link"].get<std::string>());
@@ -229,61 +248,13 @@ int main() {
         
 
         }
-        /*
-        //run simulation
-        while (feeds[primaryID].hasMoreData()) {
-            for (const std::string& id : feedIDs) {
-                tempBars[id] = feeds[id].getBar();
-                bars[id] = tempBars[id]; 
-                currPrices[id] = tempBars[id].close;
-            }
-
-            tempBroker.checkLoop();
-
-            strategy->loadBar();
-            strategy->runBar();
-            
-            double value = tempAccount.accountValue(currPrices);
-            std::cout << value << " right \n";
-            //command line log for debugging purposes
-            std::cout << "Sim[" << simID << "] Date: " << tempBars[primaryID].date 
-                      << " | Balance: " << tempAccount.checkBalance() << "| Total Equity: " << value << "\n";
-
-            //log important details for plotter => Will improve later
-            tempLogger.logSnapshot(
-                tempBars[primaryID].date, 
-                tempBars, 
-                tempAccount.checkBalance(), 
-                value, 
-                tempAccount.returnPositions(),
-                calculator.drawDown(value)
-            );
-            
-            //iterate to the next bar for all used feeds
-            for (const auto& feedID : feedIDs) {
-                feeds[feedID].nextBar();
-            }
-
+        //reset account and broker
+        if(accountReset){
+            tempAccount.reset();
         }
-        std::cout << "Simulation [" << simID << "] finished" << "\n";
-        std::cout << "Account ID: " << tempAccount.id << "\n";
-        std::cout << "Broker ID: " << tempBroker.id << "\n";
-        //create the metric report
-        
-        returns = calculator.totalReturn(initBalance, currPrices);
-        //obtain the timeframe distance for cagr in the configs.json
-        cagr = calculator.cagr(initBalance, currPrices, 10);
-        //tempLogger.printAllSnapshots();
-        std::cout << "Returns: " << returns << "\n";
-        std::cout << "CAGR: " << cagr << "\n";
-
-        //export individual csvs for each simulation
-        std::string filename = "../data/results_" + simID + ".csv";
-        tempLogger.exportCSV(filename);
-        std::cout << "Exported results to " << filename << std::endl;
-        
-
-        tempLogger.exportData(simID, calculator, historyRef, currPrices, initBalance, cagrLength);*/
+        if(brokerReset){
+            tempBroker.reset();
+        }
     }
 
 

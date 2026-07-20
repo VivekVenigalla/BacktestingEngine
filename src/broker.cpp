@@ -324,6 +324,11 @@ void Broker::processOrder(int id, Order order){
     
 }
 
+void Broker::reset(){
+    orders.clear();
+    history.clear();
+}
+
 std::unordered_map<long int, Trade>& Broker::returnHistory(){
     return history;
 }

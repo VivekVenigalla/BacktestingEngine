@@ -35,11 +35,13 @@ class Account{
         //need to create a unordered map of all prices for all tickers
         double accountValue(std::unordered_map<std::string, double> currPrices);
         //double checkTotalEquity();
+        void reset();
         
         std::unordered_map<std::string, Position> returnPositions();
         std::string id;
 
     private:
+        double initial = 0.0;
         double balance = 10000.0;
         //map of all the positions in the account
         //positions.first => ticker, positions.second=> Position struct

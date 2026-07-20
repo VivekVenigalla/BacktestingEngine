@@ -1,7 +1,0 @@
-[
-    {
-        "id": "basicAccount",
-        "initial_balance": 10000,
-        "reset": true
-    }
-]

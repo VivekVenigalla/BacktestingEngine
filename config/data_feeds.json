@@ -1,9 +1,0 @@
-[
-    {
-        "id": "AAPL_1D",
-        "ticker": "AAPL",
-        "timeframe": "1D",
-        "cagr_length": 10,
-        "csv_filepath": "../data/AAPL_1D.csv"
-    }
-]

@@ -5,3 +5,4 @@ yf_env/
 data/
 plot_results/
 output/
+__pycache__/

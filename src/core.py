@@ -110,7 +110,7 @@ def save_account_config(new_account : dict):
     state["registered_accounts"]["account"].append(new_account);
 
     #create the filepath
-    filepath = os.path.join(BATCH_DIR, "accountConfig.json")
+    filepath = os.path.join(CONFIG_DIR, "accountConfig.json")
     
     #open the file if it exists and clear anything
     #since we already have the updated dict in state, it is ok if the json is cleared
@@ -127,7 +127,7 @@ def save_broker_config(new_broker : dict):
     state["registered_brokers"]["broker"].append(new_broker);
 
     #create the filepath
-    filepath = os.path.join(BATCH_DIR, "brokerConfig.json")
+    filepath = os.path.join(CONFIG_DIR, "brokerConfig.json")
     
     #open the file if it exists and clear anything
     #since we already have the updated dict in state, it is ok if the json is cleared
@@ -144,7 +144,7 @@ def save_feed_config(new_feed : dict):
     state["registered_feeds"]["data_feeds"].append(new_feed);
 
     #create the filepath
-    filepath = os.path.join(BATCH_DIR, "feedConfig.json")
+    filepath = os.path.join(CONFIG_DIR, "feedConfig.json")
     
     #open the file if it exists and clear anything
     #since we already have the updated dict in state, it is ok if the json is cleared

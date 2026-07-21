@@ -1,11 +1,18 @@
 {
-	"broker":[
-    {
-    "id":"basicBroker",
-    "commission_rate": 1,
-    "slippage_rate": 0.0005,
-    "account_link":"basicAccount",
-    "reset":true
-    }
-  ]
+    "broker": [
+        {
+            "id": "basicBroker",
+            "commission_rate": 1,
+            "slippage_rate": 0.0005,
+            "account_link": "basicAccount",
+            "reset": true
+        },
+        {
+            "id": "noSlipCommision",
+            "commission_rate": 0.0,
+            "slippage_rate": 0.0,
+            "account_link": "basicAccount",
+            "reset": true
+        }
+    ]
 }

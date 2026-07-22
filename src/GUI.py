@@ -53,11 +53,14 @@ def spawn_create_account_modal():
 
 def spawn_create_broker_modal():
     close_modal("modal_create_broker")
+    account_ids = []
+    for a in core.state["registered_accounts"]["account"]:
+        account_ids.append(a["id"])
     with dpg.window(label="Create New Global Broker", tag="modal_create_broker", modal=True, width=380, height=240):
         dpg.add_input_text(label="Broker ID", tag="m_brk_id", default_value="newBroker")
         dpg.add_input_float(label="Commission Rate", tag="m_brk_comm", default_value=1.0)
         dpg.add_input_float(label="Slippage Rate", tag="m_brk_slip", default_value=0.0005)
-        dpg.add_input_text(label="Account Link", tag="m_brk_link", default_value="basicAccount")
+        dpg.add_combo(label="Account Link", tag="m_brk_link", items = account_ids, default_value="basicAccount")
         dpg.add_checkbox(label="Reset", tag="m_brk_reset", default_value=True)
         
         def save():
@@ -210,12 +213,12 @@ def resize_windows_handler():
 # SCREEN LAYER 1: LANDING HUB
 # ==============================================================================
 with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title_bar=True, show=True):
-    dpg.add_text("QUANTITATIVE RUN ARCHIVE LANDING STATION", color=[100, 200, 255])
+    dpg.add_text("Backtesting Engine By Vivek Venigalla", color=[100, 200, 255])
     dpg.add_separator()
     dpg.add_spacer(height=10)
     with dpg.group(horizontal=True):
         with dpg.child_window(width=320, height=-1):
-            dpg.add_button(label="➕ Create New Simulation Batch", width=-1, height=50, callback=lambda: route_to_view("workbench_window"))
+            dpg.add_button(label="+ Create New Simulation Batch", width=-1, height=50, callback=lambda: route_to_view("workbench_window"))
         with dpg.child_window(width=-1, height=-1):
             dpg.add_text("Historical Batches Directory (From batchConfig/)", color=[140, 140, 140])
             dpg.add_separator()
@@ -230,7 +233,7 @@ with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title
 # ==============================================================================
 with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_bar=True, show=False):
     with dpg.group(horizontal=True):
-        dpg.add_button(label="⬅ Back to Hub", callback=lambda: route_to_view("landing_hub_window"))
+        dpg.add_button(label="Back to Hub", callback=lambda: route_to_view("landing_hub_window"))
         dpg.add_text("WORKBENCH PIPELINE MANAGEMENT", color=[100, 200, 255])
     dpg.add_separator()
     dpg.add_spacer(height=10)
@@ -270,7 +273,7 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
 # ==============================================================================
 # INITIALIZATION & EXECUTION
 # ==============================================================================
-dpg.create_viewport(title='Algorithmic Simulation Framework', width=1300, height=840)
+dpg.create_viewport(title='Backtesting Engine', width=1300, height=840)
 dpg.setup_dearpygui()
 dpg.show_viewport()
 

@@ -3,6 +3,7 @@ import core  # Safe import of core backend state and functions
 from csv_download import downloadData
 from datetime import datetime
 import math
+import yfinance as yf
 
 dpg.create_context()
 
@@ -26,6 +27,37 @@ def route_to_view(target_window_tag):
 def close_modal(modal_tag):
     if dpg.does_item_exist(modal_tag):
         dpg.delete_item(modal_tag)
+#create a message window for errors or messages
+def spawn_message_modal(title, message, is_error=False, confirm_callback=None, callback_data=None):
+    #generate a unique integer ID
+    modal_tag = dpg.generate_uuid()
+    
+    #use a conditional statement to change the color if there is a error
+    text_color = [255, 100, 100] if is_error else [255, 255, 255]
+    
+    with dpg.window(label=title, tag=modal_tag, modal=True, show=True, no_collapse=True, no_resize=True, width=350):
+        dpg.add_text(message, color=text_color, wrap=330)
+        dpg.add_spacer(height=10)
+        dpg.add_separator()
+        dpg.add_spacer(height=5)
+        
+        with dpg.group(horizontal=True):
+            #if we need a confirmation create confirmation buttons and cancel
+            if confirm_callback:
+                def wrapper_yes():
+                    confirm_callback(callback_data)
+                    dpg.delete_item(modal_tag)
+                    
+                dpg.add_button(label="Yes, Proceed", callback=wrapper_yes, width=160)
+                dpg.add_button(label="Cancel", callback=lambda: dpg.delete_item(modal_tag), width=160)
+            else:
+                #error notice message
+                dpg.add_spacer(width=135)
+                dpg.add_button(label="OK", callback=lambda: dpg.delete_item(modal_tag), width=60)
+
+    vp_width = dpg.get_viewport_client_width()
+    vp_height = dpg.get_viewport_client_height()
+    dpg.set_item_pos(modal_tag, [vp_width // 2 - 175, vp_height // 2 - 75])
 
 # ==============================================================================
 # GLOBAL REGISTRY ADDITION MODALS (Save directly to config/*.json via core)
@@ -102,6 +134,7 @@ def spawn_create_feed_modal():
             default_value={'month_day': 31, 'month': 11, 'year': 124}
         )
         def save():
+            check = True
             raw_start = dpg.get_value("m_fd_start")
             raw_end = dpg.get_value("m_fd_end")
             
@@ -113,6 +146,7 @@ def spawn_create_feed_modal():
             d1 = datetime.strptime(start_str, "%Y-%m-%d")
             d2 = datetime.strptime(end_str, "%Y-%m-%d")
             days_between = abs((d2 - d1).days)
+
 
             #use math.ceil to use only integers for the length of years elapsed
             cagr_length = math.ceil((days_between/365.2425))
@@ -127,15 +161,33 @@ def spawn_create_feed_modal():
             }
             core.save_feed_config(new_fd)
             refresh_registry_sidepane()
-            try:
-                downloadData(new_fd["ticker"], new_fd["start_date"], new_fd["end_date"], new_fd["timeframe"])
+            if(d2 <= d1):
                 close_modal("modal_create_feed")
-            except Exception as e:
-                print(f"Something went wrong: {repr(e)}")
+                
+                dpg.split_frame()
+                
+                spawn_message_modal("Invalid Date Range", "End Date must be after Start Date", is_error=True)
+                check = False
+
+
+
+            #if there are no error messages in the creation of the feed, create it
+            if check:  
+                try:
+                    downloadData(new_fd["ticker"], new_fd["start_date"], new_fd["end_date"], new_fd["timeframe"])
+                    close_modal("modal_create_feed")
+                except Exception as e:
+                    #spawn a new message
+                    close_modal("modal_create_feed")
+                
+                    dpg.split_frame()
+                    
+                    spawn_message_modal("Export Error", f"Something went wrong: {repr(e)}", is_error=True)
             
         with dpg.group(horizontal=True):
             dpg.add_button(label="Save Object", callback=save)
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_feed"))
+
 
 # --- Add Entity from Register into Active Batch ---
 def add_entity_to_batch(sender, app_data, user_data):

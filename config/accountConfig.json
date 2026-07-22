@@ -1,19 +1,24 @@
 {
-    "account":[
+    "account": [
         {
-        "id":"basicAccount",
-        "initial_balance":10000,
-        "reset":true
+            "id": "basicAccount",
+            "initial_balance": 10000,
+            "reset": true
         },
         {
-        "id":"bollAccount",
-        "initial_balance":10000,
-        "reset":true
+            "id": "bollAccount",
+            "initial_balance": 10000,
+            "reset": true
         },
         {
-        "id":"donAccount",
-        "initial_balance":10000,
-        "reset":true
+            "id": "donAccount",
+            "initial_balance": 10000,
+            "reset": true
+        },
+        {
+            "id": "testAccount",
+            "initial_balance": 123456.0,
+            "reset": true
         }
     ]
 }

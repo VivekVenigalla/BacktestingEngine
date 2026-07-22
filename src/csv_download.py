@@ -33,10 +33,6 @@ for t in tickers:
     print("Sucessful data upload")'''
 
 def downloadData(ticker, start_date, end_date, interval_set):
-    print(ticker)
-    print(start_date)
-    print(end_date)
-    print(interval_set)
     temp = yf.Ticker(ticker)
     data = temp.history(start = start_date, end = end_date, interval = interval_set, auto_adjust = True, prepost = False, actions = False)
     #adjust time rows to be formatted in &Y-%m-%d

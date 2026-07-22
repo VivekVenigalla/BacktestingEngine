@@ -10,6 +10,7 @@ ROOT_DIR = os.path.dirname(BASE_DIR) #BacktestingEngine/
 CONFIG_DIR = os.path.join(ROOT_DIR, "config") #config/
 BATCH_DIR = os.path.join(CONFIG_DIR, "batchConfig")
 OUTPUT_DIR = os.path.join(ROOT_DIR, "output")
+DATA_DIR = os.path.join(ROOT_DIR, "data")
 
 #global variables that are accessed by gui
 state = {
@@ -21,7 +22,7 @@ state = {
 
 def check_environment():
     #ensure that all paths exist and creates if necessary(useful in case of accidental deletions)
-    for path in [CONFIG_DIR, BATCH_DIR, OUTPUT_DIR]:
+    for path in [CONFIG_DIR, BATCH_DIR, OUTPUT_DIR, DATA_DIR]:
         os.makedirs(path, exist_ok=True)
         
     #in the event a config file does not exist make one with these default values
@@ -33,8 +34,16 @@ def check_environment():
                 {"id":"donAccount","initial_balance":10000,"reset":True}
             ]
         },
-        "brokerConfig.json": [{"id": "basicBroker", "commission_rate": 1.0, "slippage_rate": 0.0005, "account_link": "basicAccount", "reset": True}],
-        "feedConfig.json": [{"id": "AAPL_1D", "ticker": "AAPL", "timeframe": "1D", "cagr_length": 10, "csv_filepath": "../data/AAPL_1D.csv"}]
+        "brokerConfig.json": {
+            "broker" : [
+                {"id": "basicBroker", "commission_rate": 1.0, "slippage_rate": 0.0005, "account_link": "basicAccount", "reset": True}
+            ]
+        },
+        "feedConfig.json": {
+            "data_feeds" : [
+                {"id": "AAPL_1D", "ticker": "AAPL", "timeframe": "1D", "cagr_length": 10, "csv_filepath": "../data/AAPL_1D.csv"}
+            ]
+        }
     }
     
     #iterate over the config files and create if needed
@@ -105,6 +114,14 @@ def save_batch_config(batch_payload : dict) -> str:
     return filepath
 
 #this file requires that reload_registers is called first to have the account info already in store
+def update_account_config():
+    filepath = os.path.join(CONFIG_DIR, "accountConfig.json")
+    with open(filepath, 'w') as f:
+        #dump the dictionary into the json file
+        json.dump(state["registered_accounts"], f, indent=4)
+    print(f"Account saved")
+    reload_registers()
+
 def save_account_config(new_account : dict):
     #update the register
     state["registered_accounts"]["account"].append(new_account);
@@ -120,6 +137,14 @@ def save_account_config(new_account : dict):
     
     #print confirmation and reload registers
     print(f"Account saved")
+    reload_registers()
+
+def update_broker_config():
+    filepath = os.path.join(CONFIG_DIR, "brokerConfig.json")
+    with open(filepath, 'w') as f:
+        #dump the dictionary into the json file
+        json.dump(state["registered_brokers"], f, indent=4)
+    print(f"Broker saved")
     reload_registers()
 
 def save_broker_config(new_broker : dict):
@@ -139,6 +164,14 @@ def save_broker_config(new_broker : dict):
     print(f"Broker saved")
     reload_registers()
 
+def update_feed_config():
+    filepath = os.path.join(CONFIG_DIR, "feedConfig.json")
+    with open(filepath, 'w') as f:
+        #dump the dictionary into the json file
+        json.dump(state["registered_feeds"], f, indent=4)
+    print(f"Feed saved")
+    reload_registers()
+
 def save_feed_config(new_feed : dict):
     #update the register
     state["registered_feeds"]["data_feeds"].append(new_feed);
@@ -155,6 +188,35 @@ def save_feed_config(new_feed : dict):
     #print confirmation and reload registers
     print(f"Feed saved")
     reload_registers()
+
+def perform_delete_account(account_id):
+    state["registered_accounts"]["account"] = [
+        a for a in state["registered_accounts"]["account"] if a["id"] != account_id
+    ]
+    update_account_config()
+
+def perform_delete_broker(broker_id):
+    state["registered_brokers"]["broker"] = [
+        b for b in state["registered_brokers"]["broker"] if b["id"] != broker_id
+    ]
+    update_broker_config()
+
+def perform_delete_feed(feed_id):
+    matchFeed = next((feed for feed in state["registered_feeds"]["data_feeds"] if feed["id"] == feed_id), None)
+    state["registered_feeds"]["data_feeds"] = [
+        f for f in state["registered_feeds"]["data_feeds"] if f["id"] != feed_id
+    ]
+    #update config Json file
+    update_feed_config()
+    if(matchFeed is not None):
+        data_dir = os.path.join("..", "data")
+        os.makedirs(data_dir, exist_ok=True)
+        tempFile = matchFeed["csv_filepath"]
+        tempFile = os.path.join(data_dir, tempFile)
+        print(tempFile)
+        if os.path.exists(tempFile):
+            os.remove(tempFile)
+            print("File deleted successfully.")
 
 #when the file is imported this function is automatically runned
 reload_registers()

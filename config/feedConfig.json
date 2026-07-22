@@ -17,6 +17,15 @@
             "end_date": "2024-12-31",
             "cagr_length": 1,
             "csv_filepath": "../data/MSFT_1D_2024-01-01_2024-12-31.csv"
+        },
+        {
+            "id": "MSFT_1D_2024-01-01_2024-12-22",
+            "ticker": "MSFT",
+            "timeframe": "1D",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-22",
+            "cagr_length": 1,
+            "csv_filepath": "../data/MSFT_1D_2024-01-01_2024-12-22.csv"
         }
     ]
 }

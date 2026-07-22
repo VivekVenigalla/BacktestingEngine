@@ -4,6 +4,7 @@ from csv_download import downloadData
 from datetime import datetime
 import math
 import yfinance as yf
+import os
 
 dpg.create_context()
 
@@ -74,10 +75,10 @@ def spawn_message_modal(title, message, is_error=False, confirm_callback=None, c
 # =============================================================
 # CONFIG MODALS
 # =============================================================
-def spawn_create_account_modal(data = None):
+def spawn_create_account_modal(sender=None, app_data=None, user_data=None):
     close_modal("modal_create_account")
-    is_edit = data is not None
-
+    is_edit = user_data is not None
+    data = user_data
     init_id = data["id"] if is_edit else "newAccount"
     init_bal = data["initial_balance"] if is_edit else 10000.0
     init_reset = data["reset"] if is_edit else True
@@ -99,7 +100,7 @@ def spawn_create_account_modal(data = None):
                 for idx, a in enumerate(core.state["registered_accounts"]["account"]):
                     if a["id"] == new_acc["id"]:
                         core.state["registered_accounts"]["account"][idx] = new_acc
-                        break
+                        core.update_account_config()
             else:
                 core.save_account_config(new_acc)
             refresh_all_ui()
@@ -109,16 +110,16 @@ def spawn_create_account_modal(data = None):
             dpg.add_button(label="Save Object", callback=save)
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_account"))
 
-def spawn_create_broker_modal(data = None):
+def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
     close_modal("modal_create_broker")
     account_ids = []
     for a in core.state["registered_accounts"]["account"]:
         account_ids.append(a["id"])
-
+    data = user_data
     is_edit = data is not None
-    init_id = data["id"] if is_edit else "newAccount"
-    init_commission = data["initial_balance"] if is_edit else 10000.0
-    init_slippage = data["reset"] if is_edit else True
+    init_id = data["id"] if is_edit else "newBroker"
+    init_commission = data["commission_rate"] if is_edit else 1.0
+    init_slippage = data["slippage_rate"] if is_edit else 0.0005
     init_account = data["account_link"] if is_edit else account_ids[0]
     init_reset = data["reset"] if is_edit else True
 
@@ -141,7 +142,7 @@ def spawn_create_broker_modal(data = None):
                 for idx, b in enumerate(core.state["registered_brokers"]["broker"]):
                     if b["id"] == new_brk["id"]:
                         core.state["registered_brokers"]["broker"][idx] = new_brk
-                        break
+                        core.update_broker_config()
             else:
                 core.save_broker_config(new_brk)
 
@@ -152,13 +153,24 @@ def spawn_create_broker_modal(data = None):
             dpg.add_button(label="Save Object", callback=save)
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_broker"))
 
-def spawn_create_feed_modal(existing_data = None):
+def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
     close_modal("modal_create_feed")
-    is_edit = existing_data is not None
+    is_edit = user_data is not None
     title = "Edit Data Feed Blueprint" if is_edit else "Create New Global Data Feed"
     
-    init_tick = existing_data["ticker"] if is_edit else "MSFT"
-    init_tf = existing_data["timeframe"] if is_edit else "1D"
+    data = user_data
+    init_tick = data["ticker"] if is_edit else "MSFT"
+    init_tf = data["timeframe"] if is_edit else "1D"
+    day1 = datetime.strptime(data["start_date"], "%Y-%m-%d") if is_edit else 0
+    day2 = datetime.strptime(data["end_date"], "%Y-%m-%d") if is_edit else 0
+    init_start_day = day1.day if is_edit else 1
+    init_start_month = (day1.month -1) if is_edit else 0
+    init_start_year = (day1.year-1900) if is_edit else 124
+    init_end_day = day2.day if is_edit else 31
+    init_end_month = (day2.month -1) if is_edit else 11
+    init_end_year = (day2.year-1900) if is_edit else 124
+
+
     with dpg.window(label="Create New Global Data Feed", tag="modal_create_feed", modal=True, width=420, height=520):
         #dpg.add_input_text(label="Feed ID", tag="m_fd_id", default_value="MSFT_1D")
         dpg.add_input_text(label="Ticker", tag="m_fd_tick", default_value=init_tick)
@@ -170,16 +182,17 @@ def spawn_create_feed_modal(existing_data = None):
         dpg.add_date_picker(
             tag="m_fd_start", 
             level=dpg.mvDatePickerLevel_Day, 
-            default_value={'month_day': 1, 'month': 0, 'year': 124} #year is 2024
+            default_value={'month_day': init_start_day, 'month': init_start_month, 'year': init_start_year} #year is 2024 and month is 0 indexed
         )
         
         dpg.add_text("End Date:")
         dpg.add_date_picker(
             tag="m_fd_end", 
             level=dpg.mvDatePickerLevel_Day, 
-            default_value={'month_day': 31, 'month': 11, 'year': 124}
+            default_value={'month_day': init_end_day, 'month': init_end_month, 'year': init_end_year}
         )
         def save():
+            print("Saving...")
             check = True
             raw_start = dpg.get_value("m_fd_start")
             raw_end = dpg.get_value("m_fd_end")
@@ -243,17 +256,29 @@ def spawn_create_feed_modal(existing_data = None):
             try:
                 if is_edit:
                     for idx, f in enumerate(core.state["registered_feeds"]["data_feeds"]):
-                        if f["id"] == existing_data["id"]:
-                            core.state["registered_feeds"]["data_feeds"][idx] = fd_data
-                            break
+                        if f["id"] == user_data["id"]:
+                            core.state["registered_feeds"]["data_feeds"][idx] = new_fd
+                            core.update_feed_config()
+
+
+                            data_dir = os.path.join("..", "data")
+                            os.makedirs(data_dir, exist_ok=True)
+                            tempFile = user_data["csv_filepath"]
+                            tempFile = os.path.join(data_dir, tempFile)
+                            if os.path.exists(tempFile):
+                                os.remove(tempFile)
+                                print("File deleted successfully.")
+                                
                 else:
-                    core.save_feed_config(fd_data)
+                    core.save_feed_config(new_fd)
                 
+                print("downloading data")
+                downloadData(new_fd["ticker"], new_fd["start_date"], new_fd["end_date"], new_fd["timeframe"])
                 refresh_all_ui()
-                downloadData(fd_data["ticker"], fd_data["start_date"], fd_data["end_date"], fd_data["timeframe"])
-                close_modal("modal_feed_form")
+                print("here")               
+                close_modal("modal_create_feed")
             except Exception as e:
-                close_modal("modal_feed_form")
+                close_modal("modal_create_feed")
                 dpg.split_frame()
                 spawn_message_modal("Download Error", f"Failed to fetch market data: {repr(e)}", is_error=True)
             
@@ -261,6 +286,17 @@ def spawn_create_feed_modal(existing_data = None):
             dpg.add_button(label="Save Object", callback=save)
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_feed"))
 
+def delete_account(account_id):
+    core.perform_delete_account(account_id)
+    refresh_all_ui()
+
+def delete_broker(broker_id):
+    core.perform_delete_broker(broker_id)
+    refresh_all_ui()
+
+def delete_feed(feed_id):
+    core.perform_delete_feed(feed_id)
+    refresh_all_ui()
 
 # =============================================================
 # BATCH AND CONFIG MANAGEMENT
@@ -321,6 +357,86 @@ def refresh_registry_sidepane():
                 width=-1
             )
 
+
+#refresh config table
+def refresh_config_manager_tables():
+    #Account Table
+    if dpg.does_item_exist("table_accounts"):
+        #delete thr rows only
+        for item in dpg.get_item_children("table_accounts", 1):
+            dpg.delete_item(item)
+            
+        for acct in core.state["registered_accounts"].get("account", []):
+            with dpg.table_row(parent="table_accounts"):
+                dpg.add_text(acct["id"])
+                dpg.add_text(f"${acct['initial_balance']}")
+                dpg.add_text(str(acct["reset"]))
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Edit", callback=spawn_create_account_modal, user_data=acct)
+                    dpg.add_button(
+                        label="Delete", 
+                        callback=lambda s, a, u: spawn_message_modal(
+                            "Delete Account", 
+                            f"Delete account '{u}'?", 
+                            is_error=True,
+                            confirm_callback=delete_account, 
+                            callback_data=u
+                        ), 
+                        user_data=acct["id"]
+                    )
+
+    #Broker Table
+    if dpg.does_item_exist("table_brokers"):
+        for item in dpg.get_item_children("table_brokers", 1):
+            dpg.delete_item(item)
+            
+        for brk in core.state["registered_brokers"].get("broker", []):
+            with dpg.table_row(parent="table_brokers"):
+                dpg.add_text(brk["id"])
+                dpg.add_text(brk.get("account_link", "N/A"))
+                dpg.add_text(f"{brk['commission_rate']} / {brk['slippage_rate']}")
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Edit", callback=spawn_create_broker_modal, user_data=brk)
+                    dpg.add_button(
+                        label="Delete", 
+                        callback=lambda s, a, u: spawn_message_modal(
+                            "Delete Broker", 
+                            f"Delete broker '{u}'?", 
+                            is_error=True,
+                            confirm_callback=delete_broker, 
+                            callback_data=u
+                        ), 
+                        user_data=brk["id"]
+                    )
+
+    #Feed Table
+    if dpg.does_item_exist("table_feeds"):
+        for item in dpg.get_item_children("table_feeds", 1):
+            dpg.delete_item(item)
+            
+        for fd in core.state["registered_feeds"].get("data_feeds", []):
+            with dpg.table_row(parent="table_feeds"):
+                dpg.add_text(fd["id"])
+                dpg.add_text(fd["ticker"])
+                dpg.add_text(f"{fd.get('start_date', 'N/A')} to {fd.get('end_date', 'N/A')}")
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Edit", callback=spawn_create_feed_modal, user_data=fd)
+                    dpg.add_button(
+                        label="Delete", 
+                        callback=lambda s, a, u: spawn_message_modal(
+                            "Delete Data Feed", 
+                            f"Delete feed '{u}'?", 
+                            is_error=True,
+                            confirm_callback=delete_feed, 
+                            callback_data=u
+                        ), 
+                        user_data=fd["id"]
+                    )
+
+def refresh_all_ui():
+    refresh_registry_sidepane()
+    refresh_config_manager_tables()
+
 #themes for entire window
 with dpg.theme() as global_theme:
     with dpg.theme_component(dpg.mvAll):
@@ -328,89 +444,6 @@ with dpg.theme() as global_theme:
         dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 6, category=dpg.mvThemeCat_Core)
         dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 8, category=dpg.mvThemeCat_Core)
 dpg.bind_theme(global_theme)
-
-
-#refreshing config table
-def refresh_config_manager_tables():
-    #Account Table
-    if dpg.does_item_exist("table_accounts_container"):
-        dpg.delete_item("table_accounts_container", children_only=True)
-        #iterate over accounts
-        for acct in core.state["registered_accounts"].get("account", []):
-            with dpg.table_row(parent="table_accounts_container"):
-                dpg.add_text(acct["id"])
-                dpg.add_text(f"${acct['initial_balance']}")
-                dpg.add_text(str(acct["reset"]))
-                with dpg.group(horizontal=True):
-                    #edit button
-                    dpg.add_button(label="Edit", callback=spawn_create_account_modal, user_data=acct)
-                    #delete button(utilizing lambda)
-                    dpg.add_button(
-                        label="Delete", 
-                        callback=lambda s, a, u: spawn_message_modal(
-                            "Delete Account", 
-                            f"Delete account '{u}'?", 
-                            is_error=True,
-                            confirm_callback=perform_delete_account, 
-                            callback_data=u
-                        ), 
-                        user_data=acct["id"]
-                    )
-
-    #Broker Table
-    if dpg.does_item_exist("table_brokers_container"):
-        dpg.delete_item("table_brokers_container", children_only=True)
-        #iterate over accounts
-        for brk in core.state["registered_brokers"].get("broker", []):
-            with dpg.table_row(parent="table_brokers_container"):
-                dpg.add_text(brk["id"])
-                dpg.add_text(brk.get("account_link", "N/A"))
-                dpg.add_text(f"{brk['commission_rate']} / {brk['slippage_rate']}")
-                with dpg.group(horizontal=True):
-                    #edit button
-                    dpg.add_button(label="Edit", callback=spawn_create_broker_modal, user_data=brk)
-                    #delete button(utilizing lambda)
-                    dpg.add_button(
-                        label="Delete", 
-                        callback=lambda s, a, u: spawn_message_modal(
-                            "Delete Broker", 
-                            f"Delete broker '{u}'?", 
-                            is_error=True,
-                            confirm_callback=perform_delete_broker, 
-                            callback_data=u
-                        ), 
-                        user_data=brk["id"]
-                    )
-
-    # Refresh Feed Table
-    if dpg.does_item_exist("table_feeds_container"):
-        dpg.delete_item("table_feeds_container", children_only=True)
-        #iterate over accounts
-        for fd in core.state["registered_feeds"].get("data_feeds", []):
-            with dpg.table_row(parent="table_feeds_container"):
-                dpg.add_text(fd["id"])
-                dpg.add_text(fd["ticker"])
-                dpg.add_text(f"{fd.get('start_date', 'N/A')} to {fd.get('end_date', 'N/A')}")
-                with dpg.group(horizontal=True):
-                    #edit button
-                    dpg.add_button(label="Edit", callback=spawn_create_feed_modal, user_data=fd)
-                    #delete button(utilizing lambda)
-                    dpg.add_button(
-                        label="Delete", 
-                        callback=lambda s, a, u: spawn_message_modal(
-                            "Delete Data Feed", 
-                            f"Delete feed '{u}'?", 
-                            is_error=True,
-                            confirm_callback=perform_delete_feed, 
-                            callback_data=u
-                        ), 
-                        user_data=fd["id"]
-                    )
-
-#refresh all
-def refresh_all_ui():
-    refresh_registry_sidepane()
-    refresh_config_manager_tables()
 
 #NOTE in dearpygui, windows are the main canvas, while viewports are the individual sections you see
 
@@ -442,9 +475,9 @@ with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title
                 for batch in core.state["historical_batches"]:
                     dpg.add_text(f"{batch['batch_id']}.json (Modified: {batch['timestamp']})")
 
-# ==============================
-# VIEWPORT 3: CONFIG MANAGEMENT
-# ==============================
+# =====================================
+# VIEWPORT 2: GLOBAL CONFIG MANAGEMENT
+# =====================================
 
 with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_title_bar=True, show=False):
     with dpg.group(horizontal=True):
@@ -453,65 +486,39 @@ with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_ti
     dpg.add_separator()
     dpg.add_spacer(height=10)
     
-    #each config gets their own tab
     with dpg.tab_bar():
-        #Account tab
+        # Accounts Tab
         with dpg.tab(label="Accounts"):
             dpg.add_spacer(height=5)
             dpg.add_button(label="+ Create New Account", callback=spawn_create_account_modal)
             dpg.add_spacer(height=5)
-            with dpg.table(header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
+            with dpg.table(tag="table_accounts", header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
                 dpg.add_table_column(label="Account ID")
                 dpg.add_table_column(label="Initial Balance")
                 dpg.add_table_column(label="Reset Flag")
                 dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
-                for acct in core.state["registered_accounts"].get("account", []):
-                    with dpg.table_row():
-                        dpg.add_text(acct["id"])
-                        dpg.add_text(f"${acct['initial_balance']}")
-                        dpg.add_text(str(acct["reset"]))
-                        with dpg.group(horizontal=True):
-                            dpg.add_button(label="Edit", callback = lambda s, a, u: spawn_create_account_modal(data=u))
-                            dpg.add_button(label="Delete", callback=lambda s,a,u: spawn_message_modal("Delete?", f"Delete {u}?", confirm_callback=lambda x: print(f"Deleting {x}"), callback_data=u), user_data=acct["id"])
 
-        # --- BROKERS TAB ---
+        # Brokers Tab
         with dpg.tab(label="Brokers"):
             dpg.add_spacer(height=5)
             dpg.add_button(label="+ Create New Broker", callback=spawn_create_broker_modal)
             dpg.add_spacer(height=5)
-            with dpg.table(header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
+            with dpg.table(tag="table_brokers", header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
                 dpg.add_table_column(label="Broker ID")
                 dpg.add_table_column(label="Linked Account")
                 dpg.add_table_column(label="Commission / Slippage")
                 dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
-                for brk in core.state["registered_brokers"].get("broker", []):
-                    with dpg.table_row():
-                        dpg.add_text(brk["id"])
-                        dpg.add_text(brk.get("account_link", "N/A"))
-                        dpg.add_text(f"{brk['commission_rate']} / {brk['slippage_rate']}")
-                        with dpg.group(horizontal=True):
-                            dpg.add_button(label="Edit")
-                            dpg.add_button(label="Delete")
 
-        # --- DATA FEEDS TAB ---
+        # Data Feeds Tab
         with dpg.tab(label="Data Feeds"):
             dpg.add_spacer(height=5)
             dpg.add_button(label="+ Create New Feed", callback=spawn_create_feed_modal)
             dpg.add_spacer(height=5)
-            with dpg.table(header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
+            with dpg.table(tag="table_feeds", header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
                 dpg.add_table_column(label="Feed ID")
                 dpg.add_table_column(label="Ticker")
                 dpg.add_table_column(label="Date Range")
                 dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
-                for fd in core.state["registered_feeds"].get("data_feeds", []):
-                    with dpg.table_row():
-                        dpg.add_text(fd["id"])
-                        dpg.add_text(fd["ticker"])
-                        dpg.add_text(f"{fd.get('start_date', 'N/A')} to {fd.get('end_date', 'N/A')}")
-                        with dpg.group(horizontal=True):
-                            dpg.add_button(label="Edit")
-                            dpg.add_button(label="Delete")
-
 
 # ==============================
 # VIEWPORT 3: BATCH MANEGEMENT
@@ -558,7 +565,7 @@ dpg.set_viewport_resize_callback(resize_windows_handler)
 resize_windows_handler()
 
 # Render side-pane contents from core.state safely
-refresh_registry_sidepane()
+refresh_all_ui()
 
 dpg.start_dearpygui()
 dpg.destroy_context()

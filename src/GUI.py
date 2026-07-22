@@ -7,7 +7,7 @@ import yfinance as yf
 
 dpg.create_context()
 
-# --- Active Batch Memory Structure (Working Context) ---
+#active batch with a deafult id
 active_batch = {
     "simulation_metadata": {"batch_id": "batch_123", "notes": ""},
     "account": [],
@@ -16,17 +16,29 @@ active_batch = {
     "simulations": []
 }
 
-# --- Screen Navigation Router ---
+windows = ["landing_hub_window", "workbench_window", "config_manager_window"]
+
+# =============================================================
+# HELPER FUNCTIONS
+# =============================================================
+
+#functions for going between windows and also resizing
 def route_to_view(target_window_tag):
-    all_screens = ["landing_hub_window", "workbench_window"]
-    for view in all_screens:
+    for view in windows:
         if dpg.does_item_exist(view):
             dpg.configure_item(view, show=(view == target_window_tag))
+def resize_windows_handler():
+    w = max(dpg.get_viewport_width() - 16, 400)
+    h = max(dpg.get_viewport_height() - 39, 300)
+    for screen in windows:
+        if dpg.does_item_exist(screen):
+            dpg.configure_item(screen, width=w, height=h, pos=[0, 0])
 
-# --- Helper Modal Utility ---
+#close window
 def close_modal(modal_tag):
     if dpg.does_item_exist(modal_tag):
         dpg.delete_item(modal_tag)
+
 #create a message window for errors or messages
 def spawn_message_modal(title, message, is_error=False, confirm_callback=None, callback_data=None):
     #generate a unique integer ID
@@ -59,9 +71,9 @@ def spawn_message_modal(title, message, is_error=False, confirm_callback=None, c
     vp_height = dpg.get_viewport_client_height()
     dpg.set_item_pos(modal_tag, [vp_width // 2 - 175, vp_height // 2 - 75])
 
-# ==============================================================================
-# GLOBAL REGISTRY ADDITION MODALS (Save directly to config/*.json via core)
-# ==============================================================================
+# =============================================================
+# CONFIG MODALS
+# =============================================================
 def spawn_create_account_modal():
     close_modal("modal_create_account")
     with dpg.window(label="Create New Global Account", tag="modal_create_account", modal=True, width=350, height=200):
@@ -213,7 +225,9 @@ def spawn_create_feed_modal():
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_feed"))
 
 
-# --- Add Entity from Register into Active Batch ---
+# =============================================================
+# BATCH AND CONFIG MANAGEMENT
+# =============================================================
 def add_entity_to_batch(sender, app_data, user_data):
     entity_type, entity_data = user_data
     if entity_type == "ACCOUNT":
@@ -229,7 +243,7 @@ def add_entity_to_batch(sender, app_data, user_data):
             
     print(f"[UI] Added {entity_data['id']} to batch {entity_type} register.")
 
-# --- Refresh the Left-Pane Global Entity Lists ---
+
 def refresh_registry_sidepane():
     # Refresh Accounts List
     if dpg.does_item_exist("reg_accounts_container"):
@@ -270,7 +284,7 @@ def refresh_registry_sidepane():
                 width=-1
             )
 
-# --- Global Style & Window Resizing Handler ---
+#themes for entire window
 with dpg.theme() as global_theme:
     with dpg.theme_component(dpg.mvAll):
         dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 14, 14, category=dpg.mvThemeCat_Core)
@@ -278,23 +292,27 @@ with dpg.theme() as global_theme:
         dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 8, category=dpg.mvThemeCat_Core)
 dpg.bind_theme(global_theme)
 
-def resize_windows_handler():
-    w = max(dpg.get_viewport_width() - 16, 400)
-    h = max(dpg.get_viewport_height() - 39, 300)
-    for screen in ["landing_hub_window", "workbench_window"]:
-        if dpg.does_item_exist(screen):
-            dpg.configure_item(screen, width=w, height=h, pos=[0, 0])
+#NOTE in dearpygui, windows are the main canvas, while viewports are the individual sections you see
 
-# ==============================================================================
-# SCREEN LAYER 1: LANDING HUB
-# ==============================================================================
+# =============================================================
+# VEIEWPORTS
+# =============================================================
+
+# ================================
+# VIEWPORT 1: Landing Page
+# ================================
 with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title_bar=True, show=True):
     dpg.add_text("Backtesting Engine By Vivek Venigalla", color=[100, 200, 255])
     dpg.add_separator()
     dpg.add_spacer(height=10)
     with dpg.group(horizontal=True):
+        #left panel containg quick actions such as creating a batch or manageing global config
         with dpg.child_window(width=320, height=-1):
             dpg.add_button(label="+ Create New Simulation Batch", width=-1, height=50, callback=lambda: route_to_view("workbench_window"))
+            dpg.add_spacer(height=10)
+            dpg.add_button(label="Manage Global Infrastructure", width=-1, height=50, callback=lambda: route_to_view("config_manager_window"))
+            dpg.add_spacer(height = 10)
+        #right panel showing recent activity
         with dpg.child_window(width=-1, height=-1):
             dpg.add_text("Historical Batches Directory (From batchConfig/)", color=[140, 140, 140])
             dpg.add_separator()
@@ -302,11 +320,13 @@ with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title
                 dpg.add_text("No historical configurations found.", color=[255, 165, 0])
             else:
                 for batch in core.state["historical_batches"]:
-                    dpg.add_text(f"📂 {batch['batch_id']}.json (Modified: {batch['timestamp']})")
+                    dpg.add_text(f"{batch['batch_id']}.json (Modified: {batch['timestamp']})")
 
-# ==============================================================================
-# SCREEN LAYER 2: WORKBENCH (With Step 3 Left Pane Population)
-# ==============================================================================
+
+
+# ==============================
+# VIEWPORT 3: BATCH MANEGEMENT
+# ==============================
 with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_bar=True, show=False):
     with dpg.group(horizontal=True):
         dpg.add_button(label="Back to Hub", callback=lambda: route_to_view("landing_hub_window"))
@@ -346,9 +366,9 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
         with dpg.child_window(width=-1, height=-1):
             dpg.add_text("Active Batch Workstation Canvas (Step 4 & 5)", color=[140, 140, 140])
 
-# ==============================================================================
-# INITIALIZATION & EXECUTION
-# ==============================================================================
+# =============================================================
+# EXECUTION
+# =============================================================
 dpg.create_viewport(title='Backtesting Engine', width=1300, height=840)
 dpg.setup_dearpygui()
 dpg.show_viewport()

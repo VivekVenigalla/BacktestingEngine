@@ -74,12 +74,18 @@ def spawn_message_modal(title, message, is_error=False, confirm_callback=None, c
 # =============================================================
 # CONFIG MODALS
 # =============================================================
-def spawn_create_account_modal():
+def spawn_create_account_modal(data = None):
     close_modal("modal_create_account")
+    is_edit = data is not None
+    
+    init_id = data["id"] if is_edit else "newAccount"
+    init_bal = data["initial_balance"] if is_edit else 10000.0
+    init_reset = data["reset"] if is_edit else True
+
     with dpg.window(label="Create New Global Account", tag="modal_create_account", modal=True, width=350, height=200):
-        dpg.add_input_text(label="Account ID", tag="m_acct_id", default_value="newAccount")
-        dpg.add_input_float(label="Initial Balance", tag="m_acct_bal", default_value=10000.0)
-        dpg.add_checkbox(label="Reset", tag="m_acct_reset", default_value=True)
+        dpg.add_input_text(label="Account ID", tag="m_acct_id", default_value=init_id)
+        dpg.add_input_float(label="Initial Balance", tag="m_acct_bal", default_value=init_bal)
+        dpg.add_checkbox(label="Reset", tag="m_acct_reset", default_value=init_reset)
         
         def save():
             new_acc = {
@@ -87,7 +93,15 @@ def spawn_create_account_modal():
                 "initial_balance": dpg.get_value("m_acct_bal"),
                 "reset": dpg.get_value("m_acct_reset")
             }
-            core.save_account_config(new_acc)
+            #if it is a edit, find the account and save the new_acc into the config
+            if is_edit:
+                #find the account with the id and fill in the new_acc with a enumerate loop
+                for idx, a in enumerate(core.state["registered_accounts"]["account"]):
+                    if a["id"] == new_acc["id"]:
+                        core.state["registered_accounts"]["account"][idx] = new_acc
+                        break
+            else:
+                core.save_account_config(new_acc)
             refresh_registry_sidepane()
             close_modal("modal_create_account")
             
@@ -95,17 +109,25 @@ def spawn_create_account_modal():
             dpg.add_button(label="Save Object", callback=save)
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_account"))
 
-def spawn_create_broker_modal():
+def spawn_create_broker_modal(data = None):
     close_modal("modal_create_broker")
     account_ids = []
     for a in core.state["registered_accounts"]["account"]:
         account_ids.append(a["id"])
+
+    is_edit = data is not None
+    init_id = data["id"] if is_edit else "newAccount"
+    init_commission = data["initial_balance"] if is_edit else 10000.0
+    init_slippage = data["reset"] if is_edit else True
+    init_account = data["account_link"] if is_edit else account_ids[0]
+    init_reset = data["reset"] if is_edit else True
+
     with dpg.window(label="Create New Global Broker", tag="modal_create_broker", modal=True, width=380, height=240):
-        dpg.add_input_text(label="Broker ID", tag="m_brk_id", default_value="newBroker")
-        dpg.add_input_float(label="Commission Rate", tag="m_brk_comm", default_value=1.0)
-        dpg.add_input_float(label="Slippage Rate", tag="m_brk_slip", default_value=0.0005)
-        dpg.add_combo(label="Account Link", tag="m_brk_link", items = account_ids, default_value="basicAccount")
-        dpg.add_checkbox(label="Reset", tag="m_brk_reset", default_value=True)
+        dpg.add_input_text(label="Broker ID", tag="m_brk_id", default_value=init_id)
+        dpg.add_input_float(label="Commission Rate", tag="m_brk_comm", default_value=init_commission)
+        dpg.add_input_float(label="Slippage Rate", tag="m_brk_slip", default_value=init_slippage)
+        dpg.add_combo(label="Account Link", tag="m_brk_link", items = account_ids, default_value=init_account)
+        dpg.add_checkbox(label="Reset", tag="m_brk_reset", default_value=init_reset)
         
         def save():
             new_brk = {
@@ -115,7 +137,14 @@ def spawn_create_broker_modal():
                 "account_link": dpg.get_value("m_brk_link"),
                 "reset": dpg.get_value("m_brk_reset")
             }
-            core.save_broker_config(new_brk)
+            if is_edit:
+                for idx, b in enumerate(core.state["registered_brokers"]["broker"]):
+                    if b["id"] == new_brk["id"]:
+                        core.state["registered_brokers"]["broker"][idx] = new_brk
+                        break
+            else:
+                core.save_broker_config(new_brk)
+
             refresh_registry_sidepane()
             close_modal("modal_create_broker")
             
@@ -123,12 +152,17 @@ def spawn_create_broker_modal():
             dpg.add_button(label="Save Object", callback=save)
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_broker"))
 
-def spawn_create_feed_modal():
+def spawn_create_feed_modal(existing_data = None):
     close_modal("modal_create_feed")
+    is_edit = existing_data is not None
+    title = "Edit Data Feed Blueprint" if is_edit else "Create New Global Data Feed"
+    
+    init_tick = existing_data["ticker"] if is_edit else "MSFT"
+    init_tf = existing_data["timeframe"] if is_edit else "1D"
     with dpg.window(label="Create New Global Data Feed", tag="modal_create_feed", modal=True, width=420, height=520):
         #dpg.add_input_text(label="Feed ID", tag="m_fd_id", default_value="MSFT_1D")
-        dpg.add_input_text(label="Ticker", tag="m_fd_tick", default_value="MSFT")
-        dpg.add_combo(label = "Timeframe", tag = "m_fd_tf", items = ["1D","5D","1MO","3MO","1WK","1H"], default_value = "1D")
+        dpg.add_input_text(label="Ticker", tag="m_fd_tick", default_value=init_tick)
+        dpg.add_combo(label = "Timeframe", tag = "m_fd_tf", items = ["1D","5D","1MO","3MO","1WK","1H"], default_value = init_tf)
         #dpg.add_input_text(label="Timeframe", tag="m_fd_tf", default_value="1D")
         #dpg.add_input_int(label="CAGR Length", tag="m_fd_cagr", default_value=10)
         #dpg.add_input_text(label="CSV Filepath", tag="m_fd_csv", default_value="../data/MSFT_1D.csv")
@@ -206,19 +240,22 @@ def spawn_create_feed_modal():
 
 
             #if there are no error messages in the creation of the feed, create it
-            if check:  
-                try:
-                    core.save_feed_config(new_fd)
-                    refresh_registry_sidepane()
-                    downloadData(new_fd["ticker"], new_fd["start_date"], new_fd["end_date"], new_fd["timeframe"])
-                    close_modal("modal_create_feed")
-                except Exception as e:
-                    #spawn a new message
-                    close_modal("modal_create_feed")
+            try:
+                if is_edit:
+                    for idx, f in enumerate(core.state["registered_feeds"]["data_feeds"]):
+                        if f["id"] == existing_data["id"]:
+                            core.state["registered_feeds"]["data_feeds"][idx] = fd_data
+                            break
+                else:
+                    core.save_feed_config(fd_data)
                 
-                    dpg.split_frame()
-                    
-                    spawn_message_modal("Export Error", f"Something went wrong: {repr(e)}", is_error=True)
+                refresh_registry_sidepane()
+                downloadData(fd_data["ticker"], fd_data["start_date"], fd_data["end_date"], fd_data["timeframe"])
+                close_modal("modal_feed_form")
+            except Exception as e:
+                close_modal("modal_feed_form")
+                dpg.split_frame()
+                spawn_message_modal("Download Error", f"Failed to fetch market data: {repr(e)}", is_error=True)
             
         with dpg.group(horizontal=True):
             dpg.add_button(label="Save Object", callback=save)
@@ -299,7 +336,7 @@ dpg.bind_theme(global_theme)
 # =============================================================
 
 # ================================
-# VIEWPORT 1: Landing Page
+# VIEWPORT 1: LANDING PAGE
 # ================================
 with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title_bar=True, show=True):
     dpg.add_text("Backtesting Engine By Vivek Venigalla", color=[100, 200, 255])
@@ -322,6 +359,75 @@ with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title
                 for batch in core.state["historical_batches"]:
                     dpg.add_text(f"{batch['batch_id']}.json (Modified: {batch['timestamp']})")
 
+# ==============================
+# VIEWPORT 3: CONFIG MANAGEMENT
+# ==============================
+
+with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_title_bar=True, show=False):
+    with dpg.group(horizontal=True):
+        dpg.add_button(label="Back to Hub", callback=lambda: route_to_view("landing_hub_window"))
+        dpg.add_text("GLOBAL CONFIGURATION", color=[100, 200, 255])
+    dpg.add_separator()
+    dpg.add_spacer(height=10)
+    
+    #each config gets their own tab
+    with dpg.tab_bar():
+        #Account tab
+        with dpg.tab(label="Accounts"):
+            dpg.add_spacer(height=5)
+            dpg.add_button(label="+ Create New Account", callback=spawn_create_account_modal)
+            dpg.add_spacer(height=5)
+            with dpg.table(header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
+                dpg.add_table_column(label="Account ID")
+                dpg.add_table_column(label="Initial Balance")
+                dpg.add_table_column(label="Reset Flag")
+                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
+                for acct in core.state["registered_accounts"].get("account", []):
+                    with dpg.table_row():
+                        dpg.add_text(acct["id"])
+                        dpg.add_text(f"${acct['initial_balance']}")
+                        dpg.add_text(str(acct["reset"]))
+                        with dpg.group(horizontal=True):
+                            dpg.add_button(label="Edit", callback = lambda s, a, u: spawn_create_account_modal(data=u))
+                            dpg.add_button(label="Delete", callback=lambda s,a,u: spawn_message_modal("Delete?", f"Delete {u}?", confirm_callback=lambda x: print(f"Deleting {x}"), callback_data=u), user_data=acct["id"])
+
+        # --- BROKERS TAB ---
+        with dpg.tab(label="Brokers"):
+            dpg.add_spacer(height=5)
+            dpg.add_button(label="+ Create New Broker", callback=spawn_create_broker_modal)
+            dpg.add_spacer(height=5)
+            with dpg.table(header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
+                dpg.add_table_column(label="Broker ID")
+                dpg.add_table_column(label="Linked Account")
+                dpg.add_table_column(label="Commission / Slippage")
+                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
+                for brk in core.state["registered_brokers"].get("broker", []):
+                    with dpg.table_row():
+                        dpg.add_text(brk["id"])
+                        dpg.add_text(brk.get("account_link", "N/A"))
+                        dpg.add_text(f"{brk['commission_rate']} / {brk['slippage_rate']}")
+                        with dpg.group(horizontal=True):
+                            dpg.add_button(label="Edit")
+                            dpg.add_button(label="Delete")
+
+        # --- DATA FEEDS TAB ---
+        with dpg.tab(label="Data Feeds"):
+            dpg.add_spacer(height=5)
+            dpg.add_button(label="+ Create New Feed", callback=spawn_create_feed_modal)
+            dpg.add_spacer(height=5)
+            with dpg.table(header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
+                dpg.add_table_column(label="Feed ID")
+                dpg.add_table_column(label="Ticker")
+                dpg.add_table_column(label="Date Range")
+                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
+                for fd in core.state["registered_feeds"].get("data_feeds", []):
+                    with dpg.table_row():
+                        dpg.add_text(fd["id"])
+                        dpg.add_text(fd["ticker"])
+                        dpg.add_text(f"{fd.get('start_date', 'N/A')} to {fd.get('end_date', 'N/A')}")
+                        with dpg.group(horizontal=True):
+                            dpg.add_button(label="Edit")
+                            dpg.add_button(label="Delete")
 
 
 # ==============================
@@ -335,36 +441,28 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
     dpg.add_spacer(height=10)
     
     with dpg.group(horizontal=True):
-        # LEFT PANE: Metadata and Entity Selection Registers
+        #All nodes for the batch config
         with dpg.child_window(width=360, height=-1):
             dpg.add_input_text(label="Batch ID", tag="ui_batch_id", default_value=active_batch["simulation_metadata"]["batch_id"])
             dpg.add_input_text(label="Notes", tag="ui_batch_notes", default_value=active_batch["simulation_metadata"]["notes"])
             dpg.add_spacer(height=10)
             
-            dpg.add_text("Global Shared Infrastructure Registers", color=[100, 255, 100])
+            dpg.add_text("Node Library", color=[100, 255, 100])
             dpg.add_separator()
             
-            # Accounts Collapsible Container
-            with dpg.collapsing_header(label="Available Accounts"):
-                dpg.add_button(label="+ Create New Account Blueprint", width=-1, callback=spawn_create_account_modal)
-                dpg.add_spacer(height=5)
+            with dpg.collapsing_header(label="Accounts"):
                 with dpg.group(tag="reg_accounts_container"): pass
                 
-            # Brokers Collapsible Container
-            with dpg.collapsing_header(label="Available Brokers"):
-                dpg.add_button(label="+ Create New Broker Blueprint", width=-1, callback=spawn_create_broker_modal)
-                dpg.add_spacer(height=5)
+            with dpg.collapsing_header(label="Brokers"):
                 with dpg.group(tag="reg_brokers_container"): pass
                 
-            # Data Feeds Collapsible Container
-            with dpg.collapsing_header(label="Available Data Feeds"):
-                dpg.add_button(label="+ Create New Feed Blueprint", width=-1, callback=spawn_create_feed_modal)
-                dpg.add_spacer(height=5)
+            with dpg.collapsing_header(label="Data Feeds"):
                 with dpg.group(tag="reg_feeds_container"): pass
 
-        # RIGHT PANE: Canvas Placeholder for Step 4 & 5
+        #node editor
         with dpg.child_window(width=-1, height=-1):
-            dpg.add_text("Active Batch Workstation Canvas (Step 4 & 5)", color=[140, 140, 140])
+            with dpg.node_editor(tag="node_editor_canvas"):
+                pass
 
 # =============================================================
 # EXECUTION

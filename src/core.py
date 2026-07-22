@@ -17,6 +17,7 @@ state = {
     "registered_accounts": [],
     "registered_brokers": [],
     "registered_feeds": [],
+    "registered_strategies": [],
     "historical_batches": []
 }
 
@@ -42,6 +43,28 @@ def check_environment():
         "feedConfig.json": {
             "data_feeds" : [
                 {"id": "AAPL_1D", "ticker": "AAPL", "timeframe": "1D", "cagr_length": 10, "csv_filepath": "../data/AAPL_1D.csv"}
+            ]
+        },
+        "strategyBlueprints.json":{
+            "strategies":[
+                {
+                    "id": "sma",
+                    "display_name": "Simple Moving Average Crossover",
+                    "description": "Trend following strategy using short and long SMA crossing.",
+                    "default_params": {"fast_period": 10, "slow_period": 50}
+                },
+                {
+                    "id": "don",
+                    "display_name": "Donchian Channel",
+                    "description": "Breakout strategy using stop orders on extreme values.",
+                    "default_params": {"window": 20}
+                },
+                {
+                    "id": "boll",
+                    "display_name": "Bollinger Band",
+                    "description": "Trend following strategy utilizing standard deviations and crossings.",
+                    "default_params": {"window": 20}
+                }
             ]
         }
     }
@@ -72,6 +95,8 @@ def reload_registers():
         #feeds
         with open(os.path.join(CONFIG_DIR, "feedConfig.json"), 'r') as f:
             state["registered_feeds"] = json.load(f)
+        with open(os.path.join(CONFIG_DIR, "strategyBlueprints.json"), 'r') as f:
+            state["registered_strategies"] = json.load(f)
     except Exception as e:
         print(f"Failed parsing standard registries: {e}")
 

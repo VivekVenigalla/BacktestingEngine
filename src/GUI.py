@@ -120,14 +120,14 @@ def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
     init_id = data["id"] if is_edit else "newBroker"
     init_commission = data["commission_rate"] if is_edit else 1.0
     init_slippage = data["slippage_rate"] if is_edit else 0.0005
-    init_account = data["account_link"] if is_edit else account_ids[0]
+    #init_account = data["account_link"] if is_edit else account_ids[0]
     init_reset = data["reset"] if is_edit else True
 
     with dpg.window(label="Create New Global Broker", tag="modal_create_broker", modal=True, width=380, height=240):
         dpg.add_input_text(label="Broker ID", tag="m_brk_id", default_value=init_id)
         dpg.add_input_float(label="Commission Rate", tag="m_brk_comm", default_value=init_commission)
         dpg.add_input_float(label="Slippage Rate", tag="m_brk_slip", default_value=init_slippage)
-        dpg.add_combo(label="Account Link", tag="m_brk_link", items = account_ids, default_value=init_account)
+        #dpg.add_combo(label="Account Link", tag="m_brk_link", items = account_ids, default_value=init_account)
         dpg.add_checkbox(label="Reset", tag="m_brk_reset", default_value=init_reset)
         
         def save():
@@ -135,7 +135,7 @@ def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
                 "id": dpg.get_value("m_brk_id"),
                 "commission_rate": dpg.get_value("m_brk_comm"),
                 "slippage_rate": dpg.get_value("m_brk_slip"),
-                "account_link": dpg.get_value("m_brk_link"),
+                #"account_link": dpg.get_value("m_brk_link"),
                 "reset": dpg.get_value("m_brk_reset")
             }
             if is_edit:
@@ -316,9 +316,9 @@ def add_entity_to_batch(sender, app_data, user_data):
             
     print(f"[UI] Added {entity_data['id']} to batch {entity_type} register.")
 
-
+#refresh sidepane in view 3
 def refresh_registry_sidepane():
-    # Refresh Accounts List
+    #accounts
     if dpg.does_item_exist("reg_accounts_container"):
         dpg.delete_item("reg_accounts_container", children_only=True)
         acct_list = core.state["registered_accounts"].get("account", [])
@@ -331,7 +331,7 @@ def refresh_registry_sidepane():
                 width=-1
             )
 
-    # Refresh Brokers List
+    #brokers
     if dpg.does_item_exist("reg_brokers_container"):
         dpg.delete_item("reg_brokers_container", children_only=True)
         brk_list = core.state["registered_brokers"].get("broker", [])
@@ -344,7 +344,7 @@ def refresh_registry_sidepane():
                 width=-1
             )
 
-    # Refresh Data Feeds List
+    #feeds
     if dpg.does_item_exist("reg_feeds_container"):
         dpg.delete_item("reg_feeds_container", children_only=True)
         fd_list = core.state["registered_feeds"].get("data_feeds", [])
@@ -357,6 +357,38 @@ def refresh_registry_sidepane():
                 width=-1
             )
 
+     #strategues
+    if dpg.does_item_exist("reg_strategies_container"):
+        dpg.delete_item("reg_strategies_container", children_only=True)
+        strat_list = core.state.get("registered_strategies", {}).get("strategies", [])
+        for st in strat_list:
+            dpg.add_button(
+                label=f"+ {st['display_name']} Node", 
+                parent="reg_strategies_container", 
+                user_data=("STRATEGY", st), 
+                callback=add_entity_to_batch,
+                width=-1
+            )
+
+#refresh strategy table
+def refresh_strategy_table():
+    if dpg.does_item_exist("table_strategies"):
+        #clear rows
+        for item in dpg.get_item_children("table_strategies", 1):
+            dpg.delete_item(item)
+            
+        strategies = core.state.get("registered_strategies", {}).get("strategies", [])
+        for strat in strategies:
+            with dpg.table_row(parent="table_strategies"):
+                dpg.add_text(strat["id"])
+                dpg.add_text(strat.get("display_name", strat["id"]))
+                dpg.add_text(strat.get("description", "No description provided."))
+                
+                #format parameters
+                params_str = ", ".join(
+                    [f"{p['name']} ({p['type']}={p['default']})" for p in strat.get("parameters", [])]
+                )
+                dpg.add_text(params_str if params_str else "None")
 
 #refresh config table
 def refresh_config_manager_tables():
@@ -385,6 +417,7 @@ def refresh_config_manager_tables():
                         user_data=acct["id"]
                     )
 
+
     #Broker Table
     if dpg.does_item_exist("table_brokers"):
         for item in dpg.get_item_children("table_brokers", 1):
@@ -393,7 +426,7 @@ def refresh_config_manager_tables():
         for brk in core.state["registered_brokers"].get("broker", []):
             with dpg.table_row(parent="table_brokers"):
                 dpg.add_text(brk["id"])
-                dpg.add_text(brk.get("account_link", "N/A"))
+                #dpg.add_text(brk.get("account_link", "N/A"))
                 dpg.add_text(f"{brk['commission_rate']} / {brk['slippage_rate']}")
                 with dpg.group(horizontal=True):
                     dpg.add_button(label="Edit", callback=spawn_create_broker_modal, user_data=brk)
@@ -432,6 +465,8 @@ def refresh_config_manager_tables():
                         ), 
                         user_data=fd["id"]
                     )
+
+    refresh_strategy_table()
 
 def refresh_all_ui():
     refresh_registry_sidepane()
@@ -496,7 +531,7 @@ with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_ti
                 dpg.add_table_column(label="Account ID")
                 dpg.add_table_column(label="Initial Balance")
                 dpg.add_table_column(label="Reset Flag")
-                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
+                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=300)
 
         # Brokers Tab
         with dpg.tab(label="Brokers"):
@@ -505,9 +540,9 @@ with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_ti
             dpg.add_spacer(height=5)
             with dpg.table(tag="table_brokers", header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
                 dpg.add_table_column(label="Broker ID")
-                dpg.add_table_column(label="Linked Account")
+                #dpg.add_table_column(label="Linked Account")
                 dpg.add_table_column(label="Commission / Slippage")
-                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
+                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=300)
 
         # Data Feeds Tab
         with dpg.tab(label="Data Feeds"):
@@ -518,7 +553,23 @@ with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_ti
                 dpg.add_table_column(label="Feed ID")
                 dpg.add_table_column(label="Ticker")
                 dpg.add_table_column(label="Date Range")
-                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=150)
+                dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=300)
+
+        # Strategies Blueprint Tab (Immutable)
+        with dpg.tab(label="Strategies"):
+            dpg.add_spacer(height=5)
+            dpg.add_text(
+                "Strategy Blueprints(Read Only). These correspond to C++ files in the /strategies folder."
+                "Parameters can be customized when added to the Node Workbench.",
+                color=[180, 180, 180],
+                wrap=600
+            )
+            dpg.add_spacer(height=5)
+            with dpg.table(tag="table_strategies", header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
+                dpg.add_table_column(label="Strategy ID", width_fixed=True, init_width_or_weight=100)
+                dpg.add_table_column(label="Display Name", width_fixed=True, init_width_or_weight=200)
+                dpg.add_table_column(label="Description")
+                dpg.add_table_column(label="Default Parameters")
 
 # ==============================
 # VIEWPORT 3: BATCH MANEGEMENT
@@ -548,6 +599,9 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
                 
             with dpg.collapsing_header(label="Data Feeds"):
                 with dpg.group(tag="reg_feeds_container"): pass
+
+            with dpg.collapsing_header(label="Strategies"):
+                with dpg.group(tag="reg_strategies_container"): pass
 
         #node editor
         with dpg.child_window(width=-1, height=-1):

@@ -4,21 +4,18 @@
             "id": "basicBroker",
             "commission_rate": 1,
             "slippage_rate": 0.0005,
-            "account_link": "basicAccount",
             "reset": true
         },
         {
             "id": "noSlipCommision",
             "commission_rate": 0.0,
             "slippage_rate": 0.0,
-            "account_link": "basicAccount",
             "reset": true
         },
         {
             "id": "testBroker",
             "commission_rate": 1.0,
             "slippage_rate": 4.0,
-            "account_link": "testAccount",
             "reset": true
         }
     ]

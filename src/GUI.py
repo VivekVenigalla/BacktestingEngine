@@ -159,8 +159,6 @@ def spawn_create_feed_modal():
                 "cagr_length": cagr_length,
                 "csv_filepath": "../data/" + dpg.get_value("m_fd_tick") + "_" + dpg.get_value("m_fd_tf") +  "_" + start_str + "_" + end_str + ".csv"
             }
-            core.save_feed_config(new_fd)
-            refresh_registry_sidepane()
             if(d2 <= d1):
                 close_modal("modal_create_feed")
                 
@@ -169,11 +167,37 @@ def spawn_create_feed_modal():
                 spawn_message_modal("Invalid Date Range", "End Date must be after Start Date", is_error=True)
                 check = False
 
+            #check if the ticker is valid
+            try:
+                checkTicker = yf.Ticker(new_fd["ticker"])
+                # Attempt to download a tiny sliver of historical data
+                hist = checkTicker.history(period="1d")
+                
+                # If the ticker is fake, the resulting dataframe will be empty
+                if hist.empty:
+                    close_modal("modal_create_feed")
+                
+                    dpg.split_frame()
+                    
+                    spawn_message_modal("Ticker Wrong", f"{new_fd["ticker"]} is an invalid ticker", is_error=True)
+                    check = False
+                
+            except Exception:
+                # Catches 404 client errors or network failures
+                close_modal("modal_create_feed")
+                
+                dpg.split_frame()
+                
+                spawn_message_modal("Invalid Ticker", f"{new_fd["ticker"]} is an invalid ticker", is_error=True)
+                check = False
+
 
 
             #if there are no error messages in the creation of the feed, create it
             if check:  
                 try:
+                    core.save_feed_config(new_fd)
+                    refresh_registry_sidepane()
                     downloadData(new_fd["ticker"], new_fd["start_date"], new_fd["end_date"], new_fd["timeframe"])
                     close_modal("modal_create_feed")
                 except Exception as e:

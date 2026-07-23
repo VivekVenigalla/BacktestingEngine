@@ -720,7 +720,7 @@ def parse_workbench_canvas():
     #process and validate strategy nodes
     for node_id, strat_meta in strategy_nodes.items():
         strat_data = strat_meta["data"]
-        strat_id = strat_data["id"]
+        strat_key = strat_data["id"]
         feed_num_req = strat_data.get("feedNum", 1)
 
         conns = node_connections.get(node_id, {})
@@ -737,8 +737,8 @@ def parse_workbench_canvas():
         if not connected_brk_nodes:
             return None, f"Strategy '{strat_data.get('display_name')}' is missing a Broker connection."
         brk_obj = broker_nodes[connected_brk_nodes[0]]
-
         #ensure brokers have account link
+        brk_node_id = connected_brk_nodes[0]
         brk_conns = node_connections.get(brk_node_id, {})
         brk_acct_nodes = brk_conns.get("ACCOUNT", [])
         if not brk_acct_nodes:
@@ -749,6 +749,8 @@ def parse_workbench_canvas():
         if brk_acct_obj["id"] != acct_obj["id"]:
             return None, f"Mismatched Accounts! Strategy '{strat_data.get('display_name')}' is linked to Account '{acct_obj['id']}', but Broker '{brk_obj['id']}' is linked to Account '{brk_acct_obj['id']}'."
 
+        brk_obj["account_link"] = acct_obj["id"]
+        #used_broker_objs[brk_obj["id"]] = brk_obj
         #validate feed links and feedNum
         connected_feed_nodes = conns.get("FEED", [])
         actual_feed_count = len(connected_feed_nodes)
@@ -762,6 +764,9 @@ def parse_workbench_canvas():
 
         #get all the entity data
         feed_objs = [feed_nodes[f_node] for f_node in connected_feed_nodes]
+
+        sim_instance_id = dpg.get_value(f"sim_id_{node_id}") or f"{strat_key}_sim"
+        run_default = dpg.get_value(f"run_default_{node_id}")
 
         #get overriden parameter values of strategy
         extracted_params = {}
@@ -779,19 +784,21 @@ def parse_workbench_canvas():
         for f in feed_objs:
             compiled_feeds.add(f["id"])
 
-        # Construct Simulation Object
+        #create the sim object
         sim_instance = {
-            "strategy_id": strat_id,
-            "account_id": acct_obj["id"],
-            "broker_id": brk_obj["id"],
+            "id": sim_instance_id,
+            "strategy":strat_key,
+            "account_link": acct_obj["id"],
+            "broker_link": brk_obj["id"],
             "feed_ids": [f["id"] for f in feed_objs],
-            "parameters": extracted_params
+            "parameters": extracted_params,
+            "run_all_by_default": bool(run_default)
         }
         compiled_simulations.append(sim_instance)
 
-    # 5. Build Full Batch JSON Tree
+    #build the full JSON tree
     batch_id = dpg.get_value("ui_batch_id") or "batch_001"
-    batch_notes = dpg.get_value("ui_batch_notes") or ""
+    batch_notes = dpg.get_value("ui_batch_notes") or "No Notes"
 
     batch_config = {
         "simulation_metadata": {
@@ -804,7 +811,7 @@ def parse_workbench_canvas():
         "data_feeds": [f for f in core.state["registered_feeds"]["data_feeds"] if f["id"] in compiled_feeds],
         "simulations": compiled_simulations
     }
-
+    print(batch_config)
     return batch_config, None
 
 
@@ -839,39 +846,15 @@ def export_batch_json():
             json.dump(batch_config, f, indent=4)
 
         # Refresh historical batches state in core and update UI
-        if hasattr(core, "load_historical_batches"):
-            core.load_historical_batches()
+        if hasattr(core, "reload_registers"):
+            core.reload_registers()
             
         refresh_all_ui()
 
         spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{filepath}", need_ok = True)
     except Exception as e:
         spawn_message_modal("Export Error", f"Failed to save batch JSON:\n{repr(e)}", is_error=True)
-def export_batch_json():
-    """Callback triggered by the Save Batch button to serialize the graph into batchConfig/."""
-    batch_config, error_msg = parse_workbench_canvas()
 
-    if error_msg:
-        spawn_message_modal("Validation Error", error_msg, is_error=True)
-        return
-
-    batch_id = batch_config["simulation_metadata"]["batch_id"]
-    batch_dir = os.path.join("..", "batchConfig")
-    os.makedirs(batch_dir, exist_ok=True)
-    filepath = os.path.join(batch_dir, f"{batch_id}.json")
-
-    import json
-    try:
-        with open(filepath, "w") as f:
-            json.dump(batch_config, f, indent=4)
-
-        # Refresh historical batches in core state
-        core.load_historical_batches()
-        refresh_all_ui()
-
-        spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{filepath}")
-    except Exception as e:
-        spawn_message_modal("Export Error", f"Failed to save batch JSON:\n{repr(e)}", is_error=True)
 
 # =============================================================
 # BATCH AND CONFIG MANAGEMENT

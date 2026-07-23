@@ -23,7 +23,7 @@
             "id": "boll",
             "display_name": "Bollinger Band",
             "description": "Trend following strategy utilizing standard deviations and crossings.",
-            "feedNum":-1,
+            "feedNum":1,
             "parameters": [
               {"name": "window", "type": "int", "default": 20}
             ]

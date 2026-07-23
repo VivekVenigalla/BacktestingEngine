@@ -405,6 +405,7 @@ def spawn_account_node(account_data):
         #output pin for strategy and broker
         with dpg.node_attribute(tag=out_attr_tag, attribute_type=dpg.mvNode_Attr_Output, user_data={"pin_type": "ACCOUNT"}):
             dpg.add_text("Account Link ->", color=[100, 200, 255])
+    return node_tag
 
 
 def spawn_broker_node(broker_data):
@@ -427,6 +428,7 @@ def spawn_broker_node(broker_data):
         #ouptut pin for strategy
         with dpg.node_attribute(tag=out_broker_tag, attribute_type=dpg.mvNode_Attr_Output,user_data={"pin_type": "BROKER"}):
             dpg.add_text("Broker Link ->", color=[255, 200, 100])
+    return node_tag
 
 
 def spawn_feed_node(feed_data):
@@ -443,7 +445,7 @@ def spawn_feed_node(feed_data):
         #output pin for strategy
         with dpg.node_attribute(tag=out_feed_tag, attribute_type=dpg.mvNode_Attr_Output,user_data={"pin_type": "FEED"}):
             dpg.add_text("Feed Link ->", color=[100, 255, 100])
-
+    return node_tag
 
 def spawn_strategy_node(strategy_data):
     node_tag = dpg.generate_uuid()
@@ -502,7 +504,133 @@ def spawn_strategy_node(strategy_data):
                     dpg.add_checkbox(label=p_name, default_value=bool(p_default), tag=param_tag)
                 else:
                     dpg.add_input_text(label=p_name, default_value=str(p_default), width=120, tag=param_tag)
+    return node_tag
 
+def clear_workbench_canvas():
+    #remove all nodes and links
+    if dpg.does_item_exist("node_editor_canvas"):
+        all_items = dpg.get_all_items()
+        for item in all_items:
+            item_type = dpg.get_item_type(item)
+            if item_type in ("mvAppItemType::mvNode", "mvAppItemType::mvNodeLink"):
+                dpg.delete_item(item)
+
+def load_batch_file_to_workbench(file_path):
+    """
+    Parses an existing batch JSON file, switches to the workbench view,
+    and programmatically recreates nodes and connections.
+    """
+    if not os.path.exists(file_path):
+        spawn_message_modal("Load Error", f"Batch file not found:\n{file_path}", is_error=True)
+        return
+
+    try:
+        with open(file_path, "r") as f:
+            batch_data = json.load(f)
+    except Exception as e:
+        spawn_message_modal("Load Error", f"Failed to parse batch JSON:\n{repr(e)}", is_error=True)
+        return
+
+    # Switch view to Node Workbench
+    route_to_view("workbench_window")
+    clear_workbench_canvas()
+
+    # Set metadata fields in Workbench header
+    meta = batch_data.get("simulation_metadata", {})
+    if dpg.does_item_exist("ui_batch_id"):
+        dpg.set_value("ui_batch_id", meta.get("batch_id", "loaded_batch"))
+    if dpg.does_item_exist("ui_batch_notes"):
+        dpg.set_value("ui_batch_notes", meta.get("notes", ""))
+
+    # Tracking spawned nodes to establish visual links
+    # Maps: entity_id -> node_tag
+    spawned_accounts = {}
+    spawned_brokers = {}
+    spawned_feeds = {}
+
+    # 1. Spawn Accounts
+    for acct_data in batch_data.get("account", []):
+        node_tag = spawn_account_node(acct_data)
+        spawned_accounts[acct_data["id"]] = node_tag
+
+    # 2. Spawn Brokers & Link to Accounts
+    for brk_data in batch_data.get("broker", []):
+        brk_node_tag = spawn_broker_node(brk_data)
+        spawned_brokers[brk_data["id"]] = brk_node_tag
+
+        acct_id = brk_data.get("account_link")
+        if acct_id in spawned_accounts:
+            acct_node_tag = spawned_accounts[acct_id]
+            # Link Account Output -> Broker Account Input
+            link_nodes_by_pin_type(acct_node_tag, brk_node_tag, "ACCOUNT", "ACCOUNT")
+
+    # 3. Spawn Feeds
+    for feed_data in batch_data.get("data_feeds", []):
+        feed_node_tag = spawn_feed_node(feed_data)
+        spawned_feeds[feed_data["id"]] = feed_node_tag
+
+    # Helper lookup for strategy registered parameter definitions
+    registered_strats = {
+        st["id"]: st for st in core.state.get("registered_strategies", {}).get("strategies", [])
+    }
+
+    # 4. Spawn Strategy Simulations & Connect Links
+    for sim in batch_data.get("simulations", []):
+        strat_key = sim.get("strategy")
+        base_strat = registered_strats.get(strat_key, {"id": strat_key, "display_name": strat_key, "parameters": []})
+
+        # Spawn Strategy Node
+        strat_node_tag = spawn_strategy_node(base_strat)
+
+        # Restore Custom UI Overrides (Sim ID, Run Default, and Parameters)
+        if dpg.does_item_exist(f"sim_id_{strat_node_tag}"):
+            dpg.set_value(f"sim_id_{strat_node_tag}", sim.get("id", f"{strat_key}_sim"))
+        if dpg.does_item_exist(f"run_default_{strat_node_tag}"):
+            dpg.set_value(f"run_default_{strat_node_tag}", sim.get("run_all_by_default", True))
+
+        for p_name, p_val in sim.get("parameters", {}).items():
+            param_tag = f"param_{strat_node_tag}_{p_name}"
+            if dpg.does_item_exist(param_tag):
+                dpg.set_value(param_tag, p_val)
+
+        # Link Account -> Strategy
+        acct_id = sim.get("account_link")
+        if acct_id in spawned_accounts:
+            link_nodes_by_pin_type(spawned_accounts[acct_id], strat_node_tag, "ACCOUNT", "ACCOUNT")
+
+        # Link Broker -> Strategy
+        brk_id = sim.get("broker_link")
+        if brk_id in spawned_brokers:
+            link_nodes_by_pin_type(spawned_brokers[brk_id], strat_node_tag, "BROKER", "BROKER")
+
+        # Link Feeds -> Strategy
+        for feed_id in sim.get("feeds", []):
+            if feed_id in spawned_feeds:
+                link_nodes_by_pin_type(spawned_feeds[feed_id], strat_node_tag, "FEED", "FEED")
+
+
+def link_nodes_by_pin_type(src_node, dst_node, src_pin_type, dst_pin_type):
+    """Finds matching attribute tags between two nodes and draws a node link."""
+    src_attr = find_node_attribute(src_node, src_pin_type, is_output=True)
+    dst_attr = find_node_attribute(dst_node, dst_pin_type, is_output=False)
+
+    if src_attr and dst_attr:
+        dpg.add_node_link(src_attr, dst_attr, parent="node_editor_canvas")
+
+
+def find_node_attribute(node_tag, pin_type, is_output=False):
+    """Helper to locate the attribute ID of a specific pin on a node."""
+    children_groups = dpg.get_item_children(node_tag) or {}
+    target_attr_type = dpg.mvNode_Attr_Output if is_output else dpg.mvNode_Attr_Input
+
+    for group_idx in children_groups:
+        for child_id in children_groups[group_idx]:
+            if dpg.get_item_type(child_id) == "mvAppItemType::mvNodeAttribute":
+                conf = dpg.get_item_configuration(child_id)
+                u_data = dpg.get_item_user_data(child_id) or {}
+                if conf.get("attribute_type") == target_attr_type and u_data.get("pin_type") == src_pin_type if 'src_pin_type' in locals() else pin_type:
+                    return child_id
+    return None
 
 def get_pin_info(attr_tag):
     #retrieve the entity data and parent node

@@ -5,6 +5,7 @@ from datetime import datetime
 import math
 import yfinance as yf
 import os
+import json
 
 dpg.create_context()
 
@@ -465,6 +466,23 @@ def spawn_strategy_node(strategy_data):
             
         #inputs for parameters
         with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+            default_sim_id = f"{strategy_data['id']}_instance_{node_tag % 1000}"
+            dpg.add_input_text(
+                label="Sim ID", 
+                default_value=default_sim_id, 
+                width=130, 
+                tag=f"sim_id_{node_tag}"
+            )
+            
+            # 2. Run by Default Checkbox
+            dpg.add_checkbox(
+                label="Run Default", 
+                default_value=True, 
+                tag=f"run_default_{node_tag}"
+            )
+            
+            
+
             #dpg.add_separator()
             dpg.add_text("Parameters(Overridable):", color=[200, 200, 200])
             
@@ -621,6 +639,239 @@ def on_node_link_deleted(sender, app_data):
     dpg.delete_item(app_data)
     print(f"[UI Link Deleted] Link ID: {app_data}")
 
+
+def parse_workbench_canvas():
+    #return type : batch_config and error message if any
+
+    #inspect the active nodes and links
+    #validate all connections are correct, and compile them into the batch .json file
+    if not dpg.does_item_exist("node_editor_canvas"):
+        return None, "Node canvas does not exist."
+
+    all_items = dpg.get_all_items()
+    nodes = [item for item in all_items if dpg.get_item_type(item) == "mvAppItemType::mvNode"]
+    links = [item for item in all_items if dpg.get_item_type(item) == "mvAppItemType::mvNodeLink"]
+
+    #map attributes to nodes
+    attr_to_node = {}
+    for node_id in nodes:
+        children_groups = dpg.get_item_children(node_id) or {}
+        for group_idx in children_groups:
+            for child_id in children_groups[group_idx]:
+                if dpg.get_item_type(child_id) == "mvAppItemType::mvNodeAttribute":
+                    attr_data = dpg.get_item_user_data(child_id) or {}
+                    attr_to_node[child_id] = {
+                        "node_id": node_id,
+                        "pin_type": attr_data.get("pin_type")
+                    }
+
+    #build the connection map of all source(parent) nodes of a pin type of a particular destination(child) node
+    #graph structure: node_connections[dst_node][pint_type] = list of all parent node ids ; dst_node is the destination node
+
+    node_connections = {}
+    for link_id in links:
+        conf = dpg.get_item_configuration(link_id)
+        src_attr = conf.get("attr_1")
+        dst_attr = conf.get("attr_2")
+
+        if src_attr in attr_to_node and dst_attr in attr_to_node:
+            src_info = attr_to_node[src_attr]
+            dst_info = attr_to_node[dst_attr]
+
+            dst_node = dst_info["node_id"]
+            pin_type = dst_info["pin_type"]
+
+            if dst_node not in node_connections:
+                node_connections[dst_node] = {}
+            if pin_type not in node_connections[dst_node]:
+                node_connections[dst_node][pin_type] = []
+
+            node_connections[dst_node][pin_type].append(src_info["node_id"])
+
+    #categorize the nodes
+    account_nodes = {}
+    broker_nodes = {}
+    feed_nodes = {}
+    strategy_nodes = {}
+
+    for node_id in nodes:
+        user_data = dpg.get_item_user_data(node_id) or {}
+        node_type = user_data.get("type")
+        entity_data = user_data.get("data", {})
+
+        if node_type == "ACCOUNT":
+            account_nodes[node_id] = entity_data
+        elif node_type == "BROKER":
+            broker_nodes[node_id] = entity_data
+        elif node_type == "FEED":
+            feed_nodes[node_id] = entity_data
+        elif node_type == "STRATEGY":
+            strategy_nodes[node_id] = {"data": entity_data, "node_id": node_id}
+
+    #if there are no strategy nodes
+    if not strategy_nodes:
+        return None, "Cannot build batch: No strategy nodes placed on canvas."
+
+    compiled_simulations = []
+    compiled_accounts = set()
+    compiled_brokers = set()
+    compiled_feeds = set()
+
+    #process and validate strategy nodes
+    for node_id, strat_meta in strategy_nodes.items():
+        strat_data = strat_meta["data"]
+        strat_id = strat_data["id"]
+        feed_num_req = strat_data.get("feedNum", 1)
+
+        conns = node_connections.get(node_id, {})
+
+        #validate account link
+        connected_acct_nodes = conns.get("ACCOUNT", [])
+        #if the dict is empty that means there is no connected account node
+        if not connected_acct_nodes:
+            return None, f"Strategy '{strat_data.get('display_name')}' is missing an Account connection."
+        acct_obj = account_nodes[connected_acct_nodes[0]]
+
+        #validate broker connection
+        connected_brk_nodes = conns.get("BROKER", [])
+        if not connected_brk_nodes:
+            return None, f"Strategy '{strat_data.get('display_name')}' is missing a Broker connection."
+        brk_obj = broker_nodes[connected_brk_nodes[0]]
+
+        #ensure brokers have account link
+        brk_conns = node_connections.get(brk_node_id, {})
+        brk_acct_nodes = brk_conns.get("ACCOUNT", [])
+        if not brk_acct_nodes:
+            return None, f"Broker '{brk_obj.get('id')}' connected to Strategy '{strat_data.get('display_name')}' is missing an Account connection."
+
+        #ensure broker objects have the same link as the strategy
+        brk_acct_obj = account_nodes[brk_acct_nodes[0]]
+        if brk_acct_obj["id"] != acct_obj["id"]:
+            return None, f"Mismatched Accounts! Strategy '{strat_data.get('display_name')}' is linked to Account '{acct_obj['id']}', but Broker '{brk_obj['id']}' is linked to Account '{brk_acct_obj['id']}'."
+
+        #validate feed links and feedNum
+        connected_feed_nodes = conns.get("FEED", [])
+        actual_feed_count = len(connected_feed_nodes)
+
+        #if feedNum is greater than 0, has to be precise
+        if feed_num_req > 0 and actual_feed_count != feed_num_req:
+            return None, f"Strategy '{strat_data.get('display_name')}' requires {feed_num_req} feed(s), but has {actual_feed_count} connected."
+        #otherwise check if is greater than feedNum or not
+        elif feed_num_req < 0 and actual_feed_count < abs(feed_num_req):
+            return None, f"Strategy '{strat_data.get('display_name')}' requires at least {abs(feed_num_req)} feed(s), but only has {actual_feed_count} connected."
+
+        #get all the entity data
+        feed_objs = [feed_nodes[f_node] for f_node in connected_feed_nodes]
+
+        #get overriden parameter values of strategy
+        extracted_params = {}
+        for param in strat_data.get("parameters", []):
+            p_name = param["name"]
+            param_tag = f"param_{node_id}_{p_name}"
+            if dpg.does_item_exist(param_tag):
+                extracted_params[p_name] = dpg.get_value(param_tag)
+            else:
+                extracted_params[p_name] = param.get("default")
+
+        #any used entities are recorded
+        compiled_accounts.add(acct_obj["id"])
+        compiled_brokers.add(brk_obj["id"])
+        for f in feed_objs:
+            compiled_feeds.add(f["id"])
+
+        # Construct Simulation Object
+        sim_instance = {
+            "strategy_id": strat_id,
+            "account_id": acct_obj["id"],
+            "broker_id": brk_obj["id"],
+            "feed_ids": [f["id"] for f in feed_objs],
+            "parameters": extracted_params
+        }
+        compiled_simulations.append(sim_instance)
+
+    # 5. Build Full Batch JSON Tree
+    batch_id = dpg.get_value("ui_batch_id") or "batch_001"
+    batch_notes = dpg.get_value("ui_batch_notes") or ""
+
+    batch_config = {
+        "simulation_metadata": {
+            "batch_id": batch_id,
+            "notes": batch_notes,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        },
+        "account": [a for a in core.state["registered_accounts"]["account"] if a["id"] in compiled_accounts],
+        "broker": [b for b in core.state["registered_brokers"]["broker"] if b["id"] in compiled_brokers],
+        "data_feeds": [f for f in core.state["registered_feeds"]["data_feeds"] if f["id"] in compiled_feeds],
+        "simulations": compiled_simulations
+    }
+
+    return batch_config, None
+
+
+def export_batch_json():
+    """
+    Callback triggered by the Save Batch button.
+    Validates canvas state and exports the batch configuration to batchConfig/.
+    Prevents overwriting existing files with the same batch_id.
+    """
+    batch_config, error_msg = parse_workbench_canvas()
+
+    if error_msg:
+        spawn_message_modal("Validation Error", error_msg, is_error=True)
+        return
+
+    batch_id = batch_config["simulation_metadata"]["batch_id"]
+    batch_dir = os.path.join("..", "config/batchConfig")
+    os.makedirs(batch_dir, exist_ok=True)
+    filepath = os.path.join(batch_dir, f"{batch_id}.json")
+
+    #check if the file exists
+    if os.path.exists(filepath):
+        spawn_message_modal(
+            "Batch ID Conflict", 
+            f"A batch configuration with ID '{batch_id}' already exists at:\n{filepath}\n\n", 
+            is_error=True
+        )
+        return
+
+    try:
+        with open(filepath, "w") as f:
+            json.dump(batch_config, f, indent=4)
+
+        # Refresh historical batches state in core and update UI
+        if hasattr(core, "load_historical_batches"):
+            core.load_historical_batches()
+            
+        refresh_all_ui()
+
+        spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{filepath}", need_ok = True)
+    except Exception as e:
+        spawn_message_modal("Export Error", f"Failed to save batch JSON:\n{repr(e)}", is_error=True)
+def export_batch_json():
+    """Callback triggered by the Save Batch button to serialize the graph into batchConfig/."""
+    batch_config, error_msg = parse_workbench_canvas()
+
+    if error_msg:
+        spawn_message_modal("Validation Error", error_msg, is_error=True)
+        return
+
+    batch_id = batch_config["simulation_metadata"]["batch_id"]
+    batch_dir = os.path.join("..", "batchConfig")
+    os.makedirs(batch_dir, exist_ok=True)
+    filepath = os.path.join(batch_dir, f"{batch_id}.json")
+
+    import json
+    try:
+        with open(filepath, "w") as f:
+            json.dump(batch_config, f, indent=4)
+
+        # Refresh historical batches in core state
+        core.load_historical_batches()
+        refresh_all_ui()
+
+        spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{filepath}")
+    except Exception as e:
+        spawn_message_modal("Export Error", f"Failed to save batch JSON:\n{repr(e)}", is_error=True)
 
 # =============================================================
 # BATCH AND CONFIG MANAGEMENT
@@ -938,6 +1189,8 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
     with dpg.group(horizontal=True):
         dpg.add_button(label="Back to Hub", callback=lambda: route_to_view("landing_hub_window"))
         dpg.add_text("WORKBENCH PIPELINE MANAGEMENT", color=[100, 200, 255])
+        dpg.add_spacer(width=20)
+        dpg.add_button(label="Save & Compile Batch JSON", callback=export_batch_json)
     dpg.add_separator()
     dpg.add_spacer(height=10)
     

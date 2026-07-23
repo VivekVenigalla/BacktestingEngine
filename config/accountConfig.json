@@ -17,7 +17,7 @@
         },
         {
             "id": "testAccount",
-            "initial_balance": 123456.0,
+            "initial_balance": 12345.0,
             "reset": true
         }
     ]

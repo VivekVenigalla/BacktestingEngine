@@ -15,7 +15,7 @@
         {
             "id": "testBroker",
             "commission_rate": 1.0,
-            "slippage_rate": 4.0,
+            "slippage_rate": 1.0,
             "reset": true
         }
     ]

@@ -41,7 +41,7 @@ def close_modal(modal_tag):
         dpg.delete_item(modal_tag)
 
 #create a message window for errors or messages
-def spawn_message_modal(title, message, is_error=False, confirm_callback=None, callback_data=None):
+def spawn_message_modal(title, message, is_error=False, confirm_callback=None, callback_data=None, need_ok = False):
     #generate a unique integer ID
     modal_tag = dpg.generate_uuid()
     
@@ -63,14 +63,16 @@ def spawn_message_modal(title, message, is_error=False, confirm_callback=None, c
                     
                 dpg.add_button(label="Yes, Proceed", callback=wrapper_yes, width=160)
                 dpg.add_button(label="Cancel", callback=lambda: dpg.delete_item(modal_tag), width=160)
-            else:
+            elif is_error or need_ok:
                 #error notice message
                 dpg.add_spacer(width=135)
                 dpg.add_button(label="OK", callback=lambda: dpg.delete_item(modal_tag), width=60)
 
+
     vp_width = dpg.get_viewport_client_width()
     vp_height = dpg.get_viewport_client_height()
     dpg.set_item_pos(modal_tag, [vp_width // 2 - 175, vp_height // 2 - 75])
+    return modal_tag
 
 # =============================================================
 # CONFIG MODALS
@@ -94,6 +96,26 @@ def spawn_create_account_modal(sender=None, app_data=None, user_data=None):
                 "initial_balance": dpg.get_value("m_acct_bal"),
                 "reset": dpg.get_value("m_acct_reset")
             }
+            close_modal("modal_create_account")
+            #split frame waits for the close call to finish
+            dpg.split_frame()
+            logger_id = spawn_message_modal("Logger", "Checking for errors")
+
+            ids = []
+            for d in core.state["registered_accounts"]["account"]:
+                ids.append(d["id"])
+            #if id already exists
+            if new_acc["id"] in ids and not is_edit:
+                close_modal(logger_id)
+                dpg.split_frame()
+                spawn_message_modal("ID exists", "Account already exists", is_error=True)
+                return
+
+            if new_acc["initial_balance"] < 0.0:
+                close_modal(logger_id)
+                dpg.split_frame()
+                spawn_message_modal("Balance Error", "Invalid balance", is_error=True)
+                return
             #if it is a edit, find the account and save the new_acc into the config
             if is_edit:
                 #find the account with the id and fill in the new_acc with a enumerate loop
@@ -104,7 +126,9 @@ def spawn_create_account_modal(sender=None, app_data=None, user_data=None):
             else:
                 core.save_account_config(new_acc)
             refresh_all_ui()
-            close_modal("modal_create_account")
+            close_modal(logger_id)
+            dpg.split_frame()
+            logger_id = spawn_message_modal("Logger", f"Account {new_acc["id"]} saved", need_ok = True)  
             
         with dpg.group(horizontal=True):
             dpg.add_button(label="Save Object", callback=save)
@@ -138,6 +162,33 @@ def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
                 #"account_link": dpg.get_value("m_brk_link"),
                 "reset": dpg.get_value("m_brk_reset")
             }
+            close_modal("modal_create_broker")
+            #split frame waits for the close call to finish
+            dpg.split_frame()
+            logger_id = spawn_message_modal("Logger", "Checking for errors")
+
+            ids = []
+            for d in core.state["registered_brokers"]["broker"]:
+                ids.append(d["id"])
+            #if id already exists
+            if new_brk["id"] in ids and not is_edit:
+                close_modal(logger_id)
+                dpg.split_frame()
+                spawn_message_modal("ID exists", "Broker already exists", is_error=True)
+                return
+
+            if new_brk["commission_rate"] < 0.0:
+                close_modal(logger_id)
+                dpg.split_frame()
+                spawn_message_modal("Commission Error", "Invalid commission rate", is_error=True)
+                return
+
+            if new_brk["slippage_rate"] < 0.0:
+                close_modal(logger_id)
+                dpg.split_frame()
+                spawn_message_modal("Slippage Error", "Invalid slippage rate", is_error=True)
+                return
+
             if is_edit:
                 for idx, b in enumerate(core.state["registered_brokers"]["broker"]):
                     if b["id"] == new_brk["id"]:
@@ -146,8 +197,11 @@ def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
             else:
                 core.save_broker_config(new_brk)
 
+
             refresh_all_ui()
-            close_modal("modal_create_broker")
+            close_modal(logger_id)
+            dpg.split_frame()
+            logger_id = spawn_message_modal("Logger", f"Broker {new_brk["id"]} saved", need_ok = True)  
             
         with dpg.group(horizontal=True):
             dpg.add_button(label="Save Object", callback=save)
@@ -192,7 +246,6 @@ def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
             default_value={'month_day': init_end_day, 'month': init_end_month, 'year': init_end_year}
         )
         def save():
-            print("Saving...")
             check = True
             raw_start = dpg.get_value("m_fd_start")
             raw_end = dpg.get_value("m_fd_end")
@@ -218,13 +271,29 @@ def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
                 "cagr_length": cagr_length,
                 "csv_filepath": "../data/" + dpg.get_value("m_fd_tick") + "_" + dpg.get_value("m_fd_tf") +  "_" + start_str + "_" + end_str + ".csv"
             }
+
+            #now that we have all the values, we can close this modal and create a saving modal
+            close_modal("modal_create_feed")
+            dpg.split_frame()
+            logger_id = spawn_message_modal("Logger", "Checking for errors")
+            #obtain all ids
+            ids = []
+            for d in core.state["registered_feeds"]["data_feeds"]:
+                ids.append(d["id"])
+            #if id already exists
+            if new_fd["id"] in ids:
+                close_modal(logger_id)
+                dpg.split_frame()
+                spawn_message_modal("ID exists", "Feed already exists", is_error=True)
+                return
+
             if(d2 <= d1):
-                close_modal("modal_create_feed")
+                close_modal(logger_id)
                 
                 dpg.split_frame()
                 
                 spawn_message_modal("Invalid Date Range", "End Date must be after Start Date", is_error=True)
-                check = False
+                return
 
             #check if the ticker is valid
             try:
@@ -234,23 +303,25 @@ def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
                 
                 # If the ticker is fake, the resulting dataframe will be empty
                 if hist.empty:
-                    close_modal("modal_create_feed")
+                    close_modal(logger_id)
                 
                     dpg.split_frame()
                     
                     spawn_message_modal("Ticker Wrong", f"{new_fd["ticker"]} is an invalid ticker", is_error=True)
-                    check = False
+                    return
                 
             except Exception:
                 # Catches 404 client errors or network failures
-                close_modal("modal_create_feed")
+                close_modal(logger_id)
                 
                 dpg.split_frame()
                 
                 spawn_message_modal("Invalid Ticker", f"{new_fd["ticker"]} is an invalid ticker", is_error=True)
-                check = False
+                return
 
-
+            close_modal(logger_id)
+            dpg.split_frame()
+            logger_id = spawn_message_modal("Logger", "Saving feed")
 
             #if there are no error messages in the creation of the feed, create it
             try:
@@ -259,28 +330,41 @@ def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
                         if f["id"] == user_data["id"]:
                             core.state["registered_feeds"]["data_feeds"][idx] = new_fd
                             core.update_feed_config()
-
-
                             data_dir = os.path.join("..", "data")
                             os.makedirs(data_dir, exist_ok=True)
                             tempFile = user_data["csv_filepath"]
                             tempFile = os.path.join(data_dir, tempFile)
+
+                            close_modal(logger_id)
+                            dpg.split_frame()
+                            logger_id = spawn_message_modal("Logger", f"Edited {f["id"]} in feedConfig.json. Deleting {tempFile}...")
+
                             if os.path.exists(tempFile):
                                 os.remove(tempFile)
                                 print("File deleted successfully.")
+                                close_modal(logger_id)
+                                dpg.split_frame()
+                                logger_id = spawn_message_modal("Logger", f"Deleted {tempFile} . Downloading {new_fd["csv_filepath"]} ...")
                                 
                 else:
+                    close_modal(logger_id)
+                    dpg.split_frame()
+                    logger_id = spawn_message_modal("Logger", f"Saved {new_fd["id"]} to feedCongig.json. Downloading {new_fd["csv_filepath"]} ...")
                     core.save_feed_config(new_fd)
+
+
                 
                 print("downloading data")
                 downloadData(new_fd["ticker"], new_fd["start_date"], new_fd["end_date"], new_fd["timeframe"])
                 refresh_all_ui()
-                print("here")               
-                close_modal("modal_create_feed")
-            except Exception as e:
-                close_modal("modal_create_feed")
+                close_modal(logger_id)
                 dpg.split_frame()
-                spawn_message_modal("Download Error", f"Failed to fetch market data: {repr(e)}", is_error=True)
+                logger_id = spawn_message_modal("Logger", f"Downloaded {new_fd["csv_filepath"]} ...", need_ok = True)         
+                
+            except Exception as e:
+                close_modal(logger_id)
+                dpg.split_frame()
+                spawn_message_modal("Download Error", f"Error: {repr(e)}", is_error=True)
             
         with dpg.group(horizontal=True):
             dpg.add_button(label="Save Object", callback=save)
@@ -428,6 +512,7 @@ def refresh_config_manager_tables():
                 dpg.add_text(brk["id"])
                 #dpg.add_text(brk.get("account_link", "N/A"))
                 dpg.add_text(f"{brk['commission_rate']} / {brk['slippage_rate']}")
+                dpg.add_text(str(brk["reset"]))
                 with dpg.group(horizontal=True):
                     dpg.add_button(label="Edit", callback=spawn_create_broker_modal, user_data=brk)
                     dpg.add_button(
@@ -542,6 +627,7 @@ with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_ti
                 dpg.add_table_column(label="Broker ID")
                 #dpg.add_table_column(label="Linked Account")
                 dpg.add_table_column(label="Commission / Slippage")
+                dpg.add_table_column(label="Reset Flag")
                 dpg.add_table_column(label="Actions", width_fixed=True, init_width_or_weight=300)
 
         # Data Feeds Tab

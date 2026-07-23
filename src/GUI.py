@@ -389,12 +389,12 @@ def delete_feed(feed_id):
 
 #nodes work with nodes being the different sections and the attributes being the connections betwee nodes
 
-def spawn_account_node(account_data):
+def spawn_account_node(account_data, pos = [50,50]):
     #generate a unique id for both the tag and the attribute
     node_tag = dpg.generate_uuid()
     out_attr_tag = dpg.generate_uuid()
     
-    with dpg.node(parent="node_editor_canvas", label=f"Account: {account_data['id']}", tag=node_tag, pos=[50, 50]):
+    with dpg.node(parent="node_editor_canvas", label=f"Account: {account_data['id']}", tag=node_tag, pos=pos):
         # Store metadata inside user_data
         dpg.set_item_user_data(node_tag, {"type": "ACCOUNT", "data": account_data})
         
@@ -408,13 +408,13 @@ def spawn_account_node(account_data):
     return node_tag
 
 
-def spawn_broker_node(broker_data):
+def spawn_broker_node(broker_data, pos = [300,50]):
     node_tag = dpg.generate_uuid()
     #broker requires one in attrribute 
     in_acct_tag = dpg.generate_uuid()
     out_broker_tag = dpg.generate_uuid()
     
-    with dpg.node(parent="node_editor_canvas", label=f"Broker: {broker_data['id']}", tag=node_tag, pos=[300, 50]):
+    with dpg.node(parent="node_editor_canvas", label=f"Broker: {broker_data['id']}", tag=node_tag, pos=pos):
         dpg.set_item_user_data(node_tag, {"type": "BROKER", "data": broker_data})
         
         #input pin for account link
@@ -431,11 +431,11 @@ def spawn_broker_node(broker_data):
     return node_tag
 
 
-def spawn_feed_node(feed_data):
+def spawn_feed_node(feed_data, pos = [50,300]):
     node_tag = dpg.generate_uuid()
     out_feed_tag = dpg.generate_uuid()
     
-    with dpg.node(parent="node_editor_canvas", label=f"Feed: {feed_data['ticker']}", tag=node_tag, pos=[50, 300]):
+    with dpg.node(parent="node_editor_canvas", label=f"Feed: {feed_data['ticker']}", tag=node_tag, pos=pos):
         dpg.set_item_user_data(node_tag, {"type": "FEED", "data": feed_data})
         
         with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
@@ -447,13 +447,13 @@ def spawn_feed_node(feed_data):
             dpg.add_text("Feed Link ->", color=[100, 255, 100])
     return node_tag
 
-def spawn_strategy_node(strategy_data):
+def spawn_strategy_node(strategy_data, pos = [600,150]):
     node_tag = dpg.generate_uuid()
     in_acct_tag = dpg.generate_uuid()
     in_broker_tag = dpg.generate_uuid()
     in_feed_tag = dpg.generate_uuid()
     
-    with dpg.node(parent="node_editor_canvas", label=f"Strategy: {strategy_data['display_name']}", tag=node_tag, pos=[600, 150]):
+    with dpg.node(parent="node_editor_canvas", label=f"Strategy: {strategy_data['display_name']}", tag=node_tag, pos=pos):
         dpg.set_item_user_data(node_tag, {"type": "STRATEGY", "data": strategy_data})
         
         #input pins for account, broker, and feed
@@ -507,82 +507,82 @@ def spawn_strategy_node(strategy_data):
     return node_tag
 
 def clear_workbench_canvas():
-    #remove all nodes and links
+    #removes all objects on the canvas
     if dpg.does_item_exist("node_editor_canvas"):
-        all_items = dpg.get_all_items()
-        for item in all_items:
-            item_type = dpg.get_item_type(item)
-            if item_type in ("mvAppItemType::mvNode", "mvAppItemType::mvNodeLink"):
-                dpg.delete_item(item)
+        #children only deletes the nodes and links and not the canvas itself
+        dpg.delete_item("node_editor_canvas", children_only=True)
+
 
 def load_batch_file_to_workbench(file_path):
-    """
-    Parses an existing batch JSON file, switches to the workbench view,
-    and programmatically recreates nodes and connections.
-    """
+    #parse an existing batch and switch to workbench view, while also creating the nodes and connections
     if not os.path.exists(file_path):
         spawn_message_modal("Load Error", f"Batch file not found:\n{file_path}", is_error=True)
         return
 
     try:
         with open(file_path, "r") as f:
+            #load data
             batch_data = json.load(f)
     except Exception as e:
         spawn_message_modal("Load Error", f"Failed to parse batch JSON:\n{repr(e)}", is_error=True)
         return
 
-    # Switch view to Node Workbench
+    #change view to workbench
     route_to_view("workbench_window")
     clear_workbench_canvas()
 
-    # Set metadata fields in Workbench header
+    #get the metadata fields and set the respective fields to them
     meta = batch_data.get("simulation_metadata", {})
     if dpg.does_item_exist("ui_batch_id"):
         dpg.set_value("ui_batch_id", meta.get("batch_id", "loaded_batch"))
     if dpg.does_item_exist("ui_batch_notes"):
         dpg.set_value("ui_batch_notes", meta.get("notes", ""))
 
-    # Tracking spawned nodes to establish visual links
-    # Maps: entity_id -> node_tag
+    #track nodes to establish links
+    #these are maps for all of the of nodes and their temp node id: entity_id -> node_tag
+    #not to be confused with config id, node id are the id used to find the visual node
     spawned_accounts = {}
     spawned_brokers = {}
     spawned_feeds = {}
 
-    # 1. Spawn Accounts
-    for acct_data in batch_data.get("account", []):
-        node_tag = spawn_account_node(acct_data)
-        spawned_accounts[acct_data["id"]] = node_tag
+    x_acct, x_brk, x_feed, x_strat = 50, 300, 50, 600
+    y_acct, y_brk, y_feed, y_strat = 50, 50, 300, 150
 
-    # 2. Spawn Brokers & Link to Accounts
+    #spawn accounts
+    for acct_data in batch_data.get("account", []):
+        node_tag = spawn_account_node(acct_data, pos=[x_acct, y_acct])
+        spawned_accounts[acct_data["id"]] = node_tag
+        y_acct += 180
+
+    #spawn brokers
     for brk_data in batch_data.get("broker", []):
-        brk_node_tag = spawn_broker_node(brk_data)
-        spawned_brokers[brk_data["id"]] = brk_node_tag
+        node_tag = spawn_broker_node(brk_data, pos=[x_brk, y_brk])
+        spawned_brokers[brk_data["id"]] = node_tag
+        y_brk += 200
 
         acct_id = brk_data.get("account_link")
         if acct_id in spawned_accounts:
-            acct_node_tag = spawned_accounts[acct_id]
-            # Link Account Output -> Broker Account Input
-            link_nodes_by_pin_type(acct_node_tag, brk_node_tag, "ACCOUNT", "ACCOUNT")
+            link_nodes_by_pin_type(spawned_accounts[acct_id], node_tag, "ACCOUNT")
 
-    # 3. Spawn Feeds
+    #spawn feeds
     for feed_data in batch_data.get("data_feeds", []):
-        feed_node_tag = spawn_feed_node(feed_data)
-        spawned_feeds[feed_data["id"]] = feed_node_tag
+        node_tag = spawn_feed_node(feed_data, pos=[x_feed, y_feed])
+        spawned_feeds[feed_data["id"]] = node_tag
+        y_feed += 180
 
-    # Helper lookup for strategy registered parameter definitions
     registered_strats = {
         st["id"]: st for st in core.state.get("registered_strategies", {}).get("strategies", [])
     }
 
-    # 4. Spawn Strategy Simulations & Connect Links
+    #spawn strategies
     for sim in batch_data.get("simulations", []):
         strat_key = sim.get("strategy")
         base_strat = registered_strats.get(strat_key, {"id": strat_key, "display_name": strat_key, "parameters": []})
 
-        # Spawn Strategy Node
-        strat_node_tag = spawn_strategy_node(base_strat)
+        strat_node_tag = spawn_strategy_node(base_strat, pos=[x_strat, y_strat])
+        y_strat += 280
 
-        # Restore Custom UI Overrides (Sim ID, Run Default, and Parameters)
+        #override parameters
         if dpg.does_item_exist(f"sim_id_{strat_node_tag}"):
             dpg.set_value(f"sim_id_{strat_node_tag}", sim.get("id", f"{strat_key}_sim"))
         if dpg.does_item_exist(f"run_default_{strat_node_tag}"):
@@ -593,44 +593,60 @@ def load_batch_file_to_workbench(file_path):
             if dpg.does_item_exist(param_tag):
                 dpg.set_value(param_tag, p_val)
 
-        # Link Account -> Strategy
+        #link account to strategy
         acct_id = sim.get("account_link")
         if acct_id in spawned_accounts:
-            link_nodes_by_pin_type(spawned_accounts[acct_id], strat_node_tag, "ACCOUNT", "ACCOUNT")
+            link_nodes_by_pin_type(spawned_accounts[acct_id], strat_node_tag, "ACCOUNT")
 
-        # Link Broker -> Strategy
+        #link broker to strategy
         brk_id = sim.get("broker_link")
         if brk_id in spawned_brokers:
-            link_nodes_by_pin_type(spawned_brokers[brk_id], strat_node_tag, "BROKER", "BROKER")
+            link_nodes_by_pin_type(spawned_brokers[brk_id], strat_node_tag, "BROKER")
 
-        # Link Feeds -> Strategy
+        #link feed to strategy
         for feed_id in sim.get("feeds", []):
             if feed_id in spawned_feeds:
-                link_nodes_by_pin_type(spawned_feeds[feed_id], strat_node_tag, "FEED", "FEED")
+                link_nodes_by_pin_type(spawned_feeds[feed_id], strat_node_tag, "FEED")
+
+def find_node_attribute(node_tag, pin_type, is_output=False):
+    
+    #find the attribute id for the the matching pin type an direction
+    if not dpg.does_item_exist(node_tag):
+        return None
+
+    #get one slot children
+    children = dpg.get_item_children(node_tag, 1) or []
+    target_attr_type = dpg.mvNode_Attr_Output if is_output else dpg.mvNode_Attr_Input
+
+    for child_id in children:
+        if dpg.get_item_type(child_id) == "mvAppItemType::mvNodeAttribute":
+            conf = dpg.get_item_configuration(child_id)
+            attr_direction = conf.get("attribute_type")
+            
+            u_data = dpg.get_item_user_data(child_id) or {}
+            attr_pin_type = u_data.get("pin_type")
+
+            if attr_direction == target_attr_type and attr_pin_type == pin_type:
+                return child_id
+
+    return None
 
 
-def link_nodes_by_pin_type(src_node, dst_node, src_pin_type, dst_pin_type):
-    """Finds matching attribute tags between two nodes and draws a node link."""
-    src_attr = find_node_attribute(src_node, src_pin_type, is_output=True)
-    dst_attr = find_node_attribute(dst_node, dst_pin_type, is_output=False)
+def link_nodes_by_pin_type(src_node, dst_node, pin_type):
+    """
+    Finds the output pin on src_node and input pin on dst_node 
+    for the specified pin_type and creates a visual link wire.
+    """
+    src_attr = find_node_attribute(src_node, pin_type, is_output=True)
+    dst_attr = find_node_attribute(dst_node, pin_type, is_output=False)
 
     if src_attr and dst_attr:
         dpg.add_node_link(src_attr, dst_attr, parent="node_editor_canvas")
-
-
-def find_node_attribute(node_tag, pin_type, is_output=False):
-    """Helper to locate the attribute ID of a specific pin on a node."""
-    children_groups = dpg.get_item_children(node_tag) or {}
-    target_attr_type = dpg.mvNode_Attr_Output if is_output else dpg.mvNode_Attr_Input
-
-    for group_idx in children_groups:
-        for child_id in children_groups[group_idx]:
-            if dpg.get_item_type(child_id) == "mvAppItemType::mvNodeAttribute":
-                conf = dpg.get_item_configuration(child_id)
-                u_data = dpg.get_item_user_data(child_id) or {}
-                if conf.get("attribute_type") == target_attr_type and u_data.get("pin_type") == src_pin_type if 'src_pin_type' in locals() else pin_type:
-                    return child_id
-    return None
+        print(f"[UI Rebuild Link Success] {pin_type}: Node {src_node} -> Node {dst_node}")
+        return True
+    else:
+        print(f"[UI Rebuild Link Failed] Missing Pin for {pin_type}: src_attr={src_attr}, dst_attr={dst_attr}")
+        return False
 
 def get_pin_info(attr_tag):
     #retrieve the entity data and parent node
@@ -844,6 +860,7 @@ def parse_workbench_canvas():
     compiled_accounts = set()
     compiled_brokers = set()
     compiled_feeds = set()
+    used_broker_objs = {}
 
     #process and validate strategy nodes
     for node_id, strat_meta in strategy_nodes.items():
@@ -878,7 +895,7 @@ def parse_workbench_canvas():
             return None, f"Mismatched Accounts! Strategy '{strat_data.get('display_name')}' is linked to Account '{acct_obj['id']}', but Broker '{brk_obj['id']}' is linked to Account '{brk_acct_obj['id']}'."
 
         brk_obj["account_link"] = acct_obj["id"]
-        #used_broker_objs[brk_obj["id"]] = brk_obj
+        used_broker_objs[brk_obj["id"]] = brk_obj
         #validate feed links and feedNum
         connected_feed_nodes = conns.get("FEED", [])
         actual_feed_count = len(connected_feed_nodes)
@@ -918,7 +935,7 @@ def parse_workbench_canvas():
             "strategy":strat_key,
             "account_link": acct_obj["id"],
             "broker_link": brk_obj["id"],
-            "feed_ids": [f["id"] for f in feed_objs],
+            "feeds": [f["id"] for f in feed_objs],
             "parameters": extracted_params,
             "run_all_by_default": bool(run_default)
         }
@@ -935,20 +952,30 @@ def parse_workbench_canvas():
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         },
         "account": [a for a in core.state["registered_accounts"]["account"] if a["id"] in compiled_accounts],
-        "broker": [b for b in core.state["registered_brokers"]["broker"] if b["id"] in compiled_brokers],
+        "broker": list(used_broker_objs.values()),
         "data_feeds": [f for f in core.state["registered_feeds"]["data_feeds"] if f["id"] in compiled_feeds],
         "simulations": compiled_simulations
     }
     print(batch_config)
     return batch_config, None
 
+def export_confirm(test):
+    try:
+        with open(test[0], "w") as f:
+            json.dump(test[1], f, indent=4)
+
+        #refresh registries(such as state)
+        if hasattr(core, "reload_registers"):
+            core.reload_registers()
+            
+        refresh_all_ui()
+
+        spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{test[0]}", need_ok = True)
+    except Exception as e:
+        spawn_message_modal("Export Error", f"Failed to save batch JSON:\n{repr(e)}", is_error=True)
 
 def export_batch_json():
-    """
-    Callback triggered by the Save Batch button.
-    Validates canvas state and exports the batch configuration to batchConfig/.
-    Prevents overwriting existing files with the same batch_id.
-    """
+    #get the batch and error message if one is present
     batch_config, error_msg = parse_workbench_canvas()
 
     if error_msg:
@@ -959,29 +986,14 @@ def export_batch_json():
     batch_dir = os.path.join("..", "config/batchConfig")
     os.makedirs(batch_dir, exist_ok=True)
     filepath = os.path.join(batch_dir, f"{batch_id}.json")
-
+    test = [filepath, batch_config]
     #check if the file exists
     if os.path.exists(filepath):
         spawn_message_modal(
-            "Batch ID Conflict", 
-            f"A batch configuration with ID '{batch_id}' already exists at:\n{filepath}\n\n", 
-            is_error=True
+            "Batch ID Conflict", #create a new message with a callback for the exporting
+            f"A batch configuration with ID '{batch_id}' already exists at:\n{filepath}\n\n Proceed with download?",confirm_callback = export_confirm, callback_data = test
         )
         return
-
-    try:
-        with open(filepath, "w") as f:
-            json.dump(batch_config, f, indent=4)
-
-        # Refresh historical batches state in core and update UI
-        if hasattr(core, "reload_registers"):
-            core.reload_registers()
-            
-        refresh_all_ui()
-
-        spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{filepath}", need_ok = True)
-    except Exception as e:
-        spawn_message_modal("Export Error", f"Failed to save batch JSON:\n{repr(e)}", is_error=True)
 
 
 # =============================================================
@@ -1199,6 +1211,20 @@ def delete_selected_canvas_items():
     for node in selected_nodes:
         dpg.delete_item(node)
 
+#target directory for file selection
+default_batch_dir = os.path.abspath(os.path.join("..", "config/batchConfig"))
+
+os.makedirs(default_batch_dir, exist_ok=True)
+
+def on_batch_file_selected(sender, app_data):
+    selected_path = app_data.get("file_path_name")
+    if selected_path:
+        load_batch_file_to_workbench(selected_path)
+
+# Register file dialog component
+with dpg.file_dialog(directory_selector=False,show=False,callback=on_batch_file_selected,tag="batch_file_dialog",width=700,height=400, default_path=default_batch_dir):
+    dpg.add_file_extension(".json", color=[0, 255, 0, 255])
+
 
 #NOTE in dearpygui, windows are the main canvas, while viewports are the individual sections you see
 
@@ -1216,6 +1242,8 @@ with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title
     with dpg.group(horizontal=True):
         #left panel containg quick actions such as creating a batch or manageing global config
         with dpg.child_window(width=320, height=-1):
+            dpg.add_button(label="Open Batch File for Editing", width = -1, height = 50, callback=lambda: dpg.show_item("batch_file_dialog"))
+            dpg.add_spacer(height=10)
             dpg.add_button(label="+ Create New Simulation Batch", width=-1, height=50, callback=lambda: route_to_view("workbench_window"))
             dpg.add_spacer(height=10)
             dpg.add_button(label="Manage Global Infrastructure", width=-1, height=50, callback=lambda: route_to_view("config_manager_window"))

@@ -485,31 +485,50 @@ def spawn_strategy_node(strategy_data):
                 else:
                     dpg.add_input_text(label=p_name, default_value=str(p_default), width=120, tag=param_tag)
 
+
 def get_pin_info(attr_tag):
-    #get the parent node attr tag and data in the curr node
+    #retrieve the entity data and parent node
+    if not dpg.does_item_exist(attr_tag):
+        return None, None
     node_tag = dpg.get_item_parent(attr_tag)
+    if not dpg.does_item_exist(node_tag):
+        return None, None
     node_data = dpg.get_item_user_data(node_tag)
     return node_tag, node_data
 
 
+def get_all_active_links():
+    #get a list of all node link items on the canvas
+    all_items = dpg.get_all_items()
+    links = []
+    for item in all_items:
+        #check if the item is a node link
+        if dpg.get_item_type(item) == "mvAppItemType::mvNodeLink":
+            links.append(item)
+    return links
+
+
 def on_node_link_created(sender, app_data):
-    #when a two pins are connected 
-    #app_data is a tuple (attr_start, attr_end)
+    
+    #when two nodes are connected, this is executed
+    #app data is the start and end node
     attr_start, attr_end = app_data
     
     node_start, data_start = get_pin_info(attr_start)
     node_end, data_end = get_pin_info(attr_end)
     
+    #if there is any missing data send a error
     if not data_start or not data_end:
         print("[UI Link Error] Missing user data on connected nodes.")
-        dpg.split_frame()        
-        spawn_message_modal("User data", "Missing data on connected nodes", is_error=True)
+        dpg.split_frame()
+        spawn_message_modal("Node Error", f"Missing data on connected nodes", is_error=True)
         return
 
+    #get the type of each nodes
     type_start = data_start.get("type")
     type_end = data_end.get("type")
     
-    # valid connections in start and end
+    #valid connection rules (first -> second)
     valid_connections = [
         ("ACCOUNT", "BROKER"),
         ("ACCOUNT", "STRATEGY"),
@@ -517,57 +536,80 @@ def on_node_link_created(sender, app_data):
         ("FEED", "STRATEGY")
     ]
 
-    #check if the start and end are valid combos
-    if (type_start, type_end) in valid_connections:
-        #check feed capacity
-        if type_start == "FEED" and type_end == "STRATEGY":
-            strat_info = data_end.get("data", {})
-            feed_num = data_end.get("feedNum", 1)
-            
-            #get all links
-            existing_links = dpg.get_item_children("node_editor_canvas", 1) or []
-            feed_link_count = 0
-            #filter links for this strategy and are feeds
-            for link_id in existing_links:
-                # Check if item is actually a node link before getting configuration
-                if dpg.get_item_type(link_id) == "mvAppItemType::mvNodeLink":
-                    conf = dpg.get_item_configuration(link_id)
-                    attr_target = conf.get("attr_2")
-                    if attr_target and dpg.does_item_exist(attr_target):
-                        if dpg.get_item_parent(attr_target) == node_end:
-                            attr_source = conf.get("attr_1")
-                            if attr_source and dpg.does_item_exist(attr_source):
-                                #NOTE, the _ is a placeholder for the parent node that is not needed in this case
-                                _ , src_data = get_pin_info(attr_source)
-                                if src_data and src_data.get("type") == "FEED":
-                                    feed_link_count += 1
-
-            #check against the strategy feedNum
-            if feed_num > 0 and feed_link_count >= feed_num:
-                print(f"[UI Link Blocked] Strategy '{strat_info.get('id')}' only accepts {feed_num} feed(s).")
-                dpg.split_frame()        
-                spawn_message_modal("Strategy data", f"Strategy '{strat_info.get('id')}' only accepts {feed_num} feed(s)", is_error=True)
-                return
-
-        #if valid create the wire
-        dpg.add_node_link(attr_start, attr_end, parent=sender)
-        print(f"[UI Link Created] {type_start} -> {type_end}")
-    else:
+    #check link is in the valid list
+    if (type_start, type_end) not in valid_connections:
         print(f"[UI Link Blocked] Invalid Connection: {type_start} -> {type_end}")
-        dpg.split_frame()        
-        spawn_message_modal("Invalid Connection", f"Invalid Connection: {type_start} -> {type_end}", is_error=True)
+        dpg.split_frame()
+        spawn_message_modal("Link Error", f"Invalid Connection: {type_start} -> {type_end}", is_error=True)
         return
 
+    #get all active links
+    active_links = get_all_active_links()
+
+    #if it is not a feed -> strategy, there is a limit of one link
+    if (type_start, type_end) in [("ACCOUNT", "BROKER"), ("ACCOUNT", "STRATEGY"), ("BROKER", "STRATEGY")]:
+        for link_id in active_links:
+            #this returns the values in the set_node_data
+            conf = dpg.get_item_configuration(link_id)
+            exist_start_attr = conf.get("attr_1")
+            exist_end_attr = conf.get("attr_2")
+            
+            exist_src_node, exist_src_data = get_pin_info(exist_start_attr)
+            exist_dst_node, exist_dst_data = get_pin_info(exist_end_attr)
+            
+            #check if target node already has a link active to it
+            if exist_dst_node == node_end and exist_src_data and exist_src_data.get("type") == type_start:
+                print(f"[UI Link Blocked] Node already has a connected {type_start}.")
+                dpg.split_frame()
+                spawn_message_modal("Link Error", f"Node already has a connected {type_start}", is_error=True)
+                return
+
+    #if it is a feed to strategy, use feedNum
+    elif type_start == "FEED" and type_end == "STRATEGY":
+        strat_info = data_end.get("data", {})
+        feed_num = strat_info.get("feedNum", 1)
+        
+        #count incoming feed links to strategy node
+        feed_link_count = 0
+        for link_id in active_links:
+            conf = dpg.get_item_configuration(link_id)
+            exist_start_attr = conf.get("attr_1")
+            exist_end_attr = conf.get("attr_2")
+            
+            exist_dst_node, _ = get_pin_info(exist_end_attr)
+            if exist_dst_node == node_end:
+                #NOTE: _ is a placeholder that is not used
+                _ , src_data = get_pin_info(exist_start_attr)
+                if src_data and src_data.get("type") == "FEED":
+                    #prevent duplicate link to the same strategy
+                    exist_src_node, _ = get_pin_info(exist_start_attr)
+                    if exist_src_node == node_start:
+                        print(f"[UI Link Blocked] This Feed is already connected to this Strategy.")
+                        dpg.split_frame()
+                        spawn_message_modal("Link Error", f"This Feed is already connected to this Strategy", is_error=True)
+                        return
+                    feed_link_count += 1
+
+        #positive feedNum, struct requirement
+        if feed_num > 0 and feed_link_count >= feed_num:
+            print(f"[UI Link Blocked] Strategy '{strat_info.get('id')}' only allows maximum {feed_num} feed(s).")
+            dpg.split_frame()
+            spawn_message_modal("Link Error", f"Strategy '{strat_info.get('id')}' only allows maximum {feed_num} feed(s)", is_error=True)
+            return
+            
+        #negative feedNum, At least abs(feedNum) feeds required
+        elif feed_num < 0:
+            print(f"[UI Link Info] Strategy allows variable feeds (min {abs(feed_num)} required). Current feeds: {feed_link_count + 1}")
+
+    # If all validation passes, spawn the link wire
+    dpg.add_node_link(attr_start, attr_end, parent=sender)
+    print(f"[UI Link Created] {type_start} -> {type_end}")
 
 def on_node_link_deleted(sender, app_data):
-    """
-    Triggered when a user disconnects or deletes a link wire.
-    app_data is the link tag ID.
-    """
-    #triggered when wire disconnected
-    #app_data is the link tag id
+    #app_data is the link tag ID
     dpg.delete_item(app_data)
     print(f"[UI Link Deleted] Link ID: {app_data}")
+
 
 # =============================================================
 # BATCH AND CONFIG MANAGEMENT

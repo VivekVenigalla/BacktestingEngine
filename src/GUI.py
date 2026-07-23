@@ -383,22 +383,126 @@ def delete_feed(feed_id):
     refresh_all_ui()
 
 # =============================================================
+# NODE EDITING
+# =============================================================
+
+#nodes work with nodes being the different sections and the attributes being the connections betwee nodes
+
+def spawn_account_node(account_data):
+    #generate a unique id for both the tag and the attribute
+    node_tag = dpg.generate_uuid()
+    out_attr_tag = dpg.generate_uuid()
+    
+    with dpg.node(parent="node_editor_canvas", label=f"Account: {account_data['id']}", tag=node_tag, pos=[50, 50]):
+        # Store metadata inside user_data
+        dpg.set_item_user_data(node_tag, {"type": "ACCOUNT", "data": account_data})
+        
+        with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+            dpg.add_text(f"Initial Balance: ${account_data['initial_balance']}")
+            dpg.add_text(f"Reset on Run: {account_data['reset']}")
+            
+        #output pin for strategy and broker
+        with dpg.node_attribute(tag=out_attr_tag, attribute_type=dpg.mvNode_Attr_Output):
+            dpg.add_text("Account Link ->", color=[100, 200, 255])
+
+
+def spawn_broker_node(broker_data):
+    node_tag = dpg.generate_uuid()
+    #broker requires one in attrribute 
+    in_acct_tag = dpg.generate_uuid()
+    out_broker_tag = dpg.generate_uuid()
+    
+    with dpg.node(parent="node_editor_canvas", label=f"Broker: {broker_data['id']}", tag=node_tag, pos=[300, 50]):
+        dpg.set_item_user_data(node_tag, {"type": "BROKER", "data": broker_data})
+        
+        #input pin for account link
+        with dpg.node_attribute(tag=in_acct_tag, attribute_type=dpg.mvNode_Attr_Input):
+            dpg.add_text("<- Account Link", color=[100, 200, 255])
+            
+        with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+            dpg.add_text(f"Commission: {broker_data['commission_rate']}")
+            dpg.add_text(f"Slippage: {broker_data['slippage_rate']}")
+            
+        #ouptut pin for strategy
+        with dpg.node_attribute(tag=out_broker_tag, attribute_type=dpg.mvNode_Attr_Output):
+            dpg.add_text("Broker Link ->", color=[255, 200, 100])
+
+
+def spawn_feed_node(feed_data):
+    node_tag = dpg.generate_uuid()
+    out_feed_tag = dpg.generate_uuid()
+    
+    with dpg.node(parent="node_editor_canvas", label=f"Feed: {feed_data['ticker']}", tag=node_tag, pos=[50, 300]):
+        dpg.set_item_user_data(node_tag, {"type": "FEED", "data": feed_data})
+        
+        with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+            dpg.add_text(f"Timeframe: {feed_data['timeframe']}")
+            dpg.add_text(f"Range: {feed_data.get('start_date', '')} to {feed_data.get('end_date', '')}")
+            
+        #output pin for strategy
+        with dpg.node_attribute(tag=out_feed_tag, attribute_type=dpg.mvNode_Attr_Output):
+            dpg.add_text("Feed Link ->", color=[100, 255, 100])
+
+
+def spawn_strategy_node(strategy_data):
+    node_tag = dpg.generate_uuid()
+    in_acct_tag = dpg.generate_uuid()
+    in_broker_tag = dpg.generate_uuid()
+    in_feed_tag = dpg.generate_uuid()
+    
+    with dpg.node(parent="node_editor_canvas", label=f"Strategy: {strategy_data['display_name']}", tag=node_tag, pos=[600, 150]):
+        dpg.set_item_user_data(node_tag, {"type": "STRATEGY", "data": strategy_data})
+        
+        #input pins for account, broker, and feed
+        with dpg.node_attribute(tag=in_acct_tag, attribute_type=dpg.mvNode_Attr_Input):
+            dpg.add_text("<- Account Link", color=[100, 200, 255])
+            
+        with dpg.node_attribute(tag=in_broker_tag, attribute_type=dpg.mvNode_Attr_Input):
+            dpg.add_text("<- Broker Link", color=[255, 200, 100])
+            
+        with dpg.node_attribute(tag=in_feed_tag, attribute_type=dpg.mvNode_Attr_Input):
+            dpg.add_text("<- Feed Link(s)", color=[100, 255, 100])
+            
+        #inputs for parameters
+        with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+            #dpg.add_separator()
+            dpg.add_text("Parameters(Overridable):", color=[200, 200, 200])
+            
+            # Dynamically draw parameter controls based on type
+            for param in strategy_data.get("parameters", []):
+                p_name = param["name"]
+                p_type = param.get("type", "float")
+                p_default = param.get("default", 0)
+                
+                param_tag = f"param_{node_tag}_{p_name}"
+                
+                if p_type == "int":
+                    dpg.add_input_int(label=p_name, default_value=int(p_default), width=120, tag=param_tag)
+                elif p_type == "float":
+                    dpg.add_input_float(label=p_name, default_value=float(p_default), width=120, tag=param_tag)
+                elif p_type == "bool":
+                    dpg.add_checkbox(label=p_name, default_value=bool(p_default), tag=param_tag)
+                else:
+                    dpg.add_input_text(label=p_name, default_value=str(p_default), width=120, tag=param_tag)
+
+# =============================================================
 # BATCH AND CONFIG MANAGEMENT
 # =============================================================
+
+#add entity to node bench in view 3
 def add_entity_to_batch(sender, app_data, user_data):
     entity_type, entity_data = user_data
+    
     if entity_type == "ACCOUNT":
-        # Check if already present to avoid duplicates
-        if not any(a["id"] == entity_data["id"] for a in active_batch["account"]):
-            active_batch["account"].append(dict(entity_data))
+        spawn_account_node(entity_data)
     elif entity_type == "BROKER":
-        if not any(b["id"] == entity_data["id"] for b in active_batch["broker"]):
-            active_batch["broker"].append(dict(entity_data))
+        spawn_broker_node(entity_data)
     elif entity_type == "FEED":
-        if not any(f["id"] == entity_data["id"] for f in active_batch["data_feeds"]):
-            active_batch["data_feeds"].append(dict(entity_data))
-            
-    print(f"[UI] Added {entity_data['id']} to batch {entity_type} register.")
+        spawn_feed_node(entity_data)
+    elif entity_type == "STRATEGY":
+        spawn_strategy_node(entity_data)
+        
+    print(f"[UI] Spawned {entity_type} Node: {entity_data['id']}")
 
 #refresh sidepane in view 3
 def refresh_registry_sidepane():
@@ -447,7 +551,7 @@ def refresh_registry_sidepane():
         strat_list = core.state.get("registered_strategies", {}).get("strategies", [])
         for st in strat_list:
             dpg.add_button(
-                label=f"+ {st['display_name']} Node", 
+                label=f"+ {st['display_name']}", 
                 parent="reg_strategies_container", 
                 user_data=("STRATEGY", st), 
                 callback=add_entity_to_batch,
@@ -467,6 +571,13 @@ def refresh_strategy_table():
                 dpg.add_text(strat["id"])
                 dpg.add_text(strat.get("display_name", strat["id"]))
                 dpg.add_text(strat.get("description", "No description provided."))
+                #if feedNum is positive the number of feeds is strict
+                feedNum = strat.get("feedNum", 1)
+                if feedNum > 0:
+                    dpg.add_text(feedNum)
+                #if the feedNum is negative, that means atleast the abs value of the feedNum
+                else:
+                    dpg.add_text(f" >= {abs(feedNum)}")
                 
                 #format parameters
                 params_str = ", ".join(
@@ -652,9 +763,10 @@ with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_ti
             )
             dpg.add_spacer(height=5)
             with dpg.table(tag="table_strategies", header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True):
-                dpg.add_table_column(label="Strategy ID", width_fixed=True, init_width_or_weight=100)
+                dpg.add_table_column(label="Strategy ID", width_fixed=True, init_width_or_weight=75)
                 dpg.add_table_column(label="Display Name", width_fixed=True, init_width_or_weight=200)
                 dpg.add_table_column(label="Description")
+                dpg.add_table_column(label="Number of Feeds", width_fixed=True, init_width_or_weight=50)
                 dpg.add_table_column(label="Default Parameters")
 
 # ==============================
@@ -691,7 +803,7 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
 
         #node editor
         with dpg.child_window(width=-1, height=-1):
-            with dpg.node_editor(tag="node_editor_canvas"):
+            with dpg.node_editor(tag="node_editor_canvas",callback=on_node_link_created, delink_callback=on_node_link_deleted):
                 pass
 
 # =============================================================

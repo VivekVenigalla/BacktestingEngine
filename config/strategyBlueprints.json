@@ -4,6 +4,7 @@
             "id": "sma",
             "display_name": "Simple Moving Average Crossover",
             "description": "Trend following strategy using short and long SMA crossing.",
+            "feedNum":1,
             "parameters": [
               {"name": "fast_period", "type": "int", "default": 10},
               {"name": "slow_period", "type": "int", "default": 50}
@@ -13,6 +14,7 @@
             "id": "don",
             "display_name": "Donchian Channel",
             "description": "Breakout strategy using stop orders on extreme values.",
+            "feedNum":1,
             "parameters": [
               {"name": "window", "type": "int", "default": 20}
             ]
@@ -21,6 +23,7 @@
             "id": "boll",
             "display_name": "Bollinger Band",
             "description": "Trend following strategy utilizing standard deviations and crossings.",
+            "feedNum":-1,
             "parameters": [
               {"name": "window", "type": "int", "default": 20}
             ]

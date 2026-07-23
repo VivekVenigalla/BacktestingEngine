@@ -402,7 +402,7 @@ def spawn_account_node(account_data):
             dpg.add_text(f"Reset on Run: {account_data['reset']}")
             
         #output pin for strategy and broker
-        with dpg.node_attribute(tag=out_attr_tag, attribute_type=dpg.mvNode_Attr_Output):
+        with dpg.node_attribute(tag=out_attr_tag, attribute_type=dpg.mvNode_Attr_Output, user_data={"pin_type": "ACCOUNT"}):
             dpg.add_text("Account Link ->", color=[100, 200, 255])
 
 
@@ -416,7 +416,7 @@ def spawn_broker_node(broker_data):
         dpg.set_item_user_data(node_tag, {"type": "BROKER", "data": broker_data})
         
         #input pin for account link
-        with dpg.node_attribute(tag=in_acct_tag, attribute_type=dpg.mvNode_Attr_Input):
+        with dpg.node_attribute(tag=in_acct_tag, attribute_type=dpg.mvNode_Attr_Input,user_data={"pin_type": "ACCOUNT"}):
             dpg.add_text("<- Account Link", color=[100, 200, 255])
             
         with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
@@ -424,7 +424,7 @@ def spawn_broker_node(broker_data):
             dpg.add_text(f"Slippage: {broker_data['slippage_rate']}")
             
         #ouptut pin for strategy
-        with dpg.node_attribute(tag=out_broker_tag, attribute_type=dpg.mvNode_Attr_Output):
+        with dpg.node_attribute(tag=out_broker_tag, attribute_type=dpg.mvNode_Attr_Output,user_data={"pin_type": "BROKER"}):
             dpg.add_text("Broker Link ->", color=[255, 200, 100])
 
 
@@ -440,7 +440,7 @@ def spawn_feed_node(feed_data):
             dpg.add_text(f"Range: {feed_data.get('start_date', '')} to {feed_data.get('end_date', '')}")
             
         #output pin for strategy
-        with dpg.node_attribute(tag=out_feed_tag, attribute_type=dpg.mvNode_Attr_Output):
+        with dpg.node_attribute(tag=out_feed_tag, attribute_type=dpg.mvNode_Attr_Output,user_data={"pin_type": "FEED"}):
             dpg.add_text("Feed Link ->", color=[100, 255, 100])
 
 
@@ -454,13 +454,13 @@ def spawn_strategy_node(strategy_data):
         dpg.set_item_user_data(node_tag, {"type": "STRATEGY", "data": strategy_data})
         
         #input pins for account, broker, and feed
-        with dpg.node_attribute(tag=in_acct_tag, attribute_type=dpg.mvNode_Attr_Input):
+        with dpg.node_attribute(tag=in_acct_tag, attribute_type=dpg.mvNode_Attr_Input,user_data={"pin_type": "ACCOUNT"}):
             dpg.add_text("<- Account Link", color=[100, 200, 255])
             
-        with dpg.node_attribute(tag=in_broker_tag, attribute_type=dpg.mvNode_Attr_Input):
+        with dpg.node_attribute(tag=in_broker_tag, attribute_type=dpg.mvNode_Attr_Input,user_data={"pin_type": "BROKER"}):
             dpg.add_text("<- Broker Link", color=[255, 200, 100])
             
-        with dpg.node_attribute(tag=in_feed_tag, attribute_type=dpg.mvNode_Attr_Input):
+        with dpg.node_attribute(tag=in_feed_tag, attribute_type=dpg.mvNode_Attr_Input,user_data={"pin_type": "FEED"}):
             dpg.add_text("<- Feed Link(s)", color=[100, 255, 100])
             
         #inputs for parameters
@@ -543,6 +543,17 @@ def on_node_link_created(sender, app_data):
         spawn_message_modal("Link Error", f"Invalid Connection: {type_start} -> {type_end}", is_error=True)
         return
 
+    #check if the connection is made at the right spots
+    #get user data of the pin
+    dst_attr_data = dpg.get_item_user_data(attr_end) or {}
+    required_pin_type = dst_attr_data.get("pin_type")
+
+    #check if the incoming pin type matches the input pin
+    if type_start != required_pin_type:
+        print(f"[UI Link Blocked] Cannot connect {type_start} output to {required_pin_type} input pin.")
+        dpg.split_frame()
+        spawn_message_modal("Link Error", f"Cannot connect {type_start} output to {required_pin_type} input pin", is_error=True)
+        return
     #get all active links
     active_links = get_all_active_links()
 

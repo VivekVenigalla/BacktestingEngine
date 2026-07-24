@@ -2,6 +2,7 @@ import os
 import json
 import glob
 from datetime import datetime
+import subprocess
 
 #Get the important directories
 #dir name returns the parent directory
@@ -242,6 +243,8 @@ def perform_delete_feed(feed_id):
         if os.path.exists(tempFile):
             os.remove(tempFile)
             print("File deleted successfully.")
+
+
 
 #when the file is imported this function is automatically runned
 reload_registers()

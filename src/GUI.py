@@ -6,6 +6,9 @@ import math
 import yfinance as yf
 import os
 import json
+import subprocess
+import threading
+import sys
 
 dpg.create_context()
 
@@ -959,42 +962,6 @@ def parse_workbench_canvas():
     print(batch_config)
     return batch_config, None
 
-def export_confirm(test):
-    try:
-        with open(test[0], "w") as f:
-            json.dump(test[1], f, indent=4)
-
-        #refresh registries(such as state)
-        if hasattr(core, "reload_registers"):
-            core.reload_registers()
-            
-        refresh_all_ui()
-
-        spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{test[0]}", need_ok = True)
-    except Exception as e:
-        spawn_message_modal("Export Error", f"Failed to save batch JSON:\n{repr(e)}", is_error=True)
-
-def export_batch_json():
-    #get the batch and error message if one is present
-    batch_config, error_msg = parse_workbench_canvas()
-
-    if error_msg:
-        spawn_message_modal("Validation Error", error_msg, is_error=True)
-        return
-
-    batch_id = batch_config["simulation_metadata"]["batch_id"]
-    batch_dir = os.path.join("..", "config/batchConfig")
-    os.makedirs(batch_dir, exist_ok=True)
-    filepath = os.path.join(batch_dir, f"{batch_id}.json")
-    test = [filepath, batch_config]
-    #check if the file exists
-    if os.path.exists(filepath):
-        spawn_message_modal(
-            "Batch ID Conflict", #create a new message with a callback for the exporting
-            f"A batch configuration with ID '{batch_id}' already exists at:\n{filepath}\n\n Proceed with download?",confirm_callback = export_confirm, callback_data = test
-        )
-        return
-
 
 # =============================================================
 # BATCH AND CONFIG MANAGEMENT
@@ -1175,6 +1142,121 @@ def refresh_config_manager_tables():
 
     refresh_strategy_table()
 
+def export_confirm(test):
+    try:
+        dpg.split_frame()
+        logger_id = spawn_message_modal("Logger", f"Exporting Batch")
+        with open(test[0], "w") as f:
+            json.dump(test[1], f, indent=4)
+
+        #refresh registries(such as state)
+        if hasattr(core, "reload_registers"):
+            core.reload_registers()
+            
+        refresh_all_ui()
+        close_modal(logger_id)
+        spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{test[0]}", need_ok = True)
+    except Exception as e:
+        spawn_message_modal("Export Error", f"Failed to save batch JSON:\n{repr(e)}", is_error=True)
+
+def export_batch_json():
+    #get the batch and error message if one is present
+    dpg.split_frame()
+    logger_id = spawn_message_modal("Logger", f"Parsing Workbench")
+
+    batch_config, error_msg = parse_workbench_canvas()
+
+    if error_msg:
+        close_modal(logger_id)
+        spawn_message_modal("Validation Error", error_msg, is_error=True)
+        return
+
+    close_modal(logger_id)
+    dpg.split_frame()
+    logger_id = spawn_message_modal("Logger", f"Checking Directory")
+
+    batch_id = batch_config["simulation_metadata"]["batch_id"]
+    batch_dir = os.path.join("..", "config/batchConfig")
+    os.makedirs(batch_dir, exist_ok=True)
+    filepath = os.path.join(batch_dir, f"{batch_id}.json")
+    test = [filepath, batch_config]
+    #check if the file exists
+    if os.path.exists(filepath):
+        close_modal(logger_id)
+        spawn_message_modal(
+            "Batch ID Conflict", #create a new message with a callback for the exporting
+            f"A batch configuration with ID '{batch_id}' already exists at:\n{filepath}\n\n Proceed with download?",confirm_callback = export_confirm, callback_data = test
+        )
+        return
+    else:
+        close_modal(logger_id)
+        export_confirm(test)
+
+def run_simulation():
+
+    batchFile = dpg.get_value("ui_batch_id") or "batch_001"
+    exec_dir = os.path.abspath(os.path.join("..", "config", "batchConfig"))
+    os.makedirs(exec_dir, exist_ok=True)
+    temp_filepath = os.path.join(exec_dir, f"{batchFile}.json")
+
+    if not os.path.exists(temp_filepath):
+        spawn_message_modal(
+            "Batch File", #create a new message with a callback for the exporting
+            f"Batch file {temp_filepath} not found. Save batch into json?",confirm_callback = export_batch_json
+        )
+        return
+
+    def buildFile():
+        build_path = os.path.abspath(os.path.join("..", "build"))
+        try:
+            print("Building project...")
+            subprocess.run(
+                ["cmake", "--build", "../build"], 
+                check=True
+            )
+            print("Build completed successfully!")
+
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error during CMake execution: {e}", file=sys.stderr)
+            spawn_message_modal("Build Error", f"Error during CMake execution: {e}", is_error = True)
+            return
+    #execute runny
+    def engine_thread_task():
+        print(f"[Engine] Starting simulation using: {temp_filepath}")
+        try:
+            #pass the batch file as a command line argument
+            dpg.split_frame()
+            logger_id = spawn_message_modal("Logger", f"Running Simulation")
+            process = subprocess.run([exe_path, temp_filepath], capture_output=True, text=True)
+            
+            if process.returncode == 0:
+                print(f"[Engine Output]\n{process.stdout}")
+                # Note: If you want to spawn a modal here, it must be thread-safe or queued
+                print("[Engine] Simulation completed successfully!")
+                close_modal(logger_id)
+                dpg.split_frame()
+                logger_id = spawn_message_modal("Logger", f"Simulation completed successfully!", need_ok = True)
+            else:
+                print(f"[Engine Error]\n{process.stderr}")
+                print("[Engine] Simulation failed.")
+                close_modal(logger_id)
+                dpg.split_frame()
+                spawn_message_modal("Execution Error", f"Simulation failed", error_msg = True)
+        except Exception as e:
+            print(f"[Engine Crash] {e}")
+            close_modal(logger_id)
+            dpg.split_frame()
+            spawn_message_modal("Execution Error", f"Engine crash {e}", error_msg = True)
+
+    #locate runny executable
+    exe_path = os.path.abspath(os.path.join("..", "build", "runny"))
+    buildFile()
+ 
+    engine_thread = threading.Thread(target=engine_thread_task, daemon=True)
+    engine_thread.start()
+
+
 def refresh_all_ui():
     refresh_registry_sidepane()
     refresh_config_manager_tables()
@@ -1330,6 +1412,7 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
         dpg.add_text("WORKBENCH PIPELINE MANAGEMENT", color=[100, 200, 255])
         dpg.add_spacer(width=20)
         dpg.add_button(label="Save & Compile Batch JSON", callback=export_batch_json)
+        dpg.add_button(label="Run Simulation", callback=run_simulation)
     dpg.add_separator()
     dpg.add_spacer(height=10)
     

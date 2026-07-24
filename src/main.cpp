@@ -24,10 +24,12 @@ using json = nlohmann::json;
 
 //no using namespace std to ensure readability
 
-int main() {
+int main(int argc, char* argv[]) {
     
-    //JSON_PATH will be altered when connected to the GUI
-    std::string JSON_PATH = "../config/batchConfig/batch_123.json";
+    //there will be one argument that is the JSON Path
+
+    std::string argument = argv[1];
+    std::string JSON_PATH = "../config/batchConfig/" + argument;
     //connect to the file
     std::ifstream file(JSON_PATH);
 

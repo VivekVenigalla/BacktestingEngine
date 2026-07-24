@@ -249,74 +249,62 @@ def perform_delete_feed(feed_id):
 
 #sim results
 
-def get_latest_sim_file(output_dir, sim_id, file_key, extension):
-    #get the last ouput file matching the pattern with the highest num if available
-    #{sim_id}_{file_key}.{ext} or {sim_id}_{file_key}_{num}.{ext}
-
+def get_latest_sim_dir(output_dir, sim_id):
+    #Finds the latest directory for a sim
     if not os.path.exists(output_dir):
         return None
 
-    #?
-    pattern = re.compile(rf"^{re.escape(sim_id)}_{re.escape(file_key)}(?:_(\d+))?\.{extension}$")
+    pattern = re.compile(rf"^{re.escape(sim_id)}(?:_(\d+))?$")
+    candidate_dirs = []
 
-    #all possible files
-    candidate_files = []
-    for fname in os.listdir(output_dir):
-        match = pattern.match(fname)
-        if match:
-            # If there's an index number group, parse integer; otherwise index is 0
-            idx = int(match.group(1)) if match.group(1) is not None else 0
-            candidate_files.append((idx, os.path.join(output_dir, fname)))
+    for item in os.listdir(output_dir):
+        full_path = os.path.join(output_dir, item)
+        if os.path.isdir(full_path):
+            match = pattern.match(item)
+            if match:
+                idx = int(match.group(1)) if match.group(1) is not None else 0
+                candidate_dirs.append((idx, full_path))
 
-    if not candidate_files:
+    if not candidate_dirs:
         return None
 
-    #sort the candidates from highest to lowest and return the first value
-    candidate_files.sort(key=lambda x: x[0], reverse=True)
-    return candidate_files[0][1]
+    #sort by descending order and return the path to the newest folder
+    candidate_dirs.sort(key=lambda x: x[0], reverse=True)
+    return candidate_dirs[0][1]
 
 
-def load_simulation_results(sim_id, output_dir=None):
-    """
-    Given a simulation ID (e.g., "sma_instance_246"), loads and parses:
-    1. Metric JSON -> {sim_id}_metricData_{num}.json
-    2. Dynamic Bar CSV -> {sim_id}_dynamicBar_{num}.csv
-    3. Trade Data CSV -> {sim_id}_tradeData_{num}.csv
-    """
-    #givena sim id, parse metric data, dynamic data, and trade data
-    #1. Metric JSON: {sim_id}_metricData_{num}.json
-    #2. Dynamic Bar CSV: {sim_id}_dynamicBar_{num}.csv
-    #3. Trade Data CSV: {sim_id}_tradeData_{num}.csv
+def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
+    #given a sim ID and batchID , load files from output/batchid/latestsimsir and parse data
     if output_dir is None:
-        #resolves relative to src/ directory
         output_dir = os.path.abspath(os.path.join("..", "output"))
 
+    #target batch and sim folder
+    batch_output_dir = os.path.join(output_dir, batch_id)
+    sim_dir = get_latest_sim_dir(batch_output_dir, sim_id)
+    print(sim_dir)
     results = {
         "sim_id": sim_id,
         "metrics": {},
-        "timeseries": {
-            "dates": [],
-            "balances": [],
-            "equities": [],
-            "drawdowns": [],
-            "prices": []
-        },
+        "timeseries": {"dates": [], "balances": [], "equities": [], "drawdowns": [], "prices": []},
         "trades": []
     }
 
-    #get metric_path
-    metric_path = get_latest_sim_file(output_dir, sim_id, "metricData", "json")
-    #check if it exists
-    if metric_path and os.path.exists(metric_path):
+    if not sim_dir or not os.path.exists(sim_dir):
+        print(f"[Results Error] No output directory found for sim '{sim_id}' inside {batch_output_dir}")
+        return results
+
+    #metrics
+    metric_path = os.path.join(sim_dir, f"metricData.json")
+    if os.path.exists(metric_path):
         try:
             with open(metric_path, "r") as f:
                 results["metrics"] = json.load(f)
         except Exception as e:
             print(f"[Results Error] Failed to read metric JSON ({metric_path}): {e}")
 
-    #parse dynamic data
-    bar_path = get_latest_sim_file(output_dir, sim_id, "dynamicBar", "csv")
-    if bar_path and os.path.exists(bar_path):
+    #dynamic data
+    bar_path = os.path.join(sim_dir, f"dynamicData.csv")
+    if os.path.exists(bar_path):
         try:
             with open(bar_path, "r") as f:
                 reader = csv.DictReader(f)
@@ -329,17 +317,15 @@ def load_simulation_results(sim_id, output_dir=None):
         except Exception as e:
             print(f"[Results Error] Failed to parse dynamic bar CSV ({bar_path}): {e}")
 
-    #parse trade data
-    trade_path = get_latest_sim_file(output_dir, sim_id, "tradeData", "csv")
-    if trade_path and os.path.exists(trade_path):
+    #trade log
+    trade_path = os.path.join(sim_dir, f"tradeData.csv")
+    if os.path.exists(trade_path):
         try:
             with open(trade_path, "r") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    #side == 0 -> buy else sell
                     side_val = str(row.get("Side", "")).strip()
                     side_label = "BUY" if side_val == "0" else "SELL"
-                    
                     results["trades"].append({
                         "id": row.get("TradeID"),
                         "ticker": row.get("TickerID"),
@@ -355,17 +341,17 @@ def load_simulation_results(sim_id, output_dir=None):
 
     return results
 
+
 def load_batch_results(batch_config, output_dir=None):
-    
-    #load performance data for all simulations in a batch
+    #load all sim data from a batch
     batch_results = {}
+    batch_id = batch_config.get("simulation_metadata", {}).get("batch_id", "")
     simulations = batch_config.get("simulations", [])
-    
+
     for sim in simulations:
         sim_id = sim.get("id")
         if sim_id:
-            batch_results[sim_id] = load_simulation_results(sim_id, output_dir)
-            
+            batch_results[sim_id] = load_simulation_results(sim_id, batch_id=batch_id, output_dir=output_dir)
     return batch_results
 
 

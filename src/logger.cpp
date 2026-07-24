@@ -180,19 +180,19 @@ void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_
     fs::create_directories(targetFolder);
 
     //export csv data
-    std::string csvFile = simID + "_dynamicData_" + std::to_string(counter) + ".csv";
+    std::string csvFile = "dynamicData.csv";
 
     fs::path csvPath = targetFolder / csvFile;
     exportCSV(csvPath, csvFile);
 
     //export csv trade data
-    csvFile = simID + "_tradeData_" + std::to_string(counter) + ".csv";
+    csvFile = "tradeData.csv";
 
     csvPath = targetFolder / csvFile;
     exportCSVTrade(csvPath, csvFile, historyRef);
 
     //export json data
-    std::string jsonFile = simID + "_metricData_" + std::to_string(counter) + ".json";
+    std::string jsonFile = "metricData.json";
 
     fs::path jsonPath = targetFolder / jsonFile;
     exportJSON(jsonPath, jsonFile, calculator, simID, currPrices, initBalance, cagrLength, historyRef);

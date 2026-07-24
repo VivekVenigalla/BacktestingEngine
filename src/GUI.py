@@ -1205,7 +1205,7 @@ def run_simulation():
             f"Batch file {temp_filepath} not found. Save batch into json?",confirm_callback = export_batch_json
         )
         return
-
+    batch_config, _ = parse_workbench_canvas()
     def buildFile():
         build_path = os.path.abspath(os.path.join("..", "build"))
         try:
@@ -1237,6 +1237,7 @@ def run_simulation():
                 close_modal(logger_id)
                 dpg.split_frame()
                 logger_id = spawn_message_modal("Logger", f"Simulation completed successfully!", need_ok = True)
+                open_results_dashboard(batch_config)
             else:
                 print(f"[Engine Error]\n{process.stderr}")
                 print("[Engine] Simulation failed.")
@@ -1248,7 +1249,6 @@ def run_simulation():
             close_modal(logger_id)
             dpg.split_frame()
             spawn_message_modal("Execution Error", f"Engine crash {e}", is_error = True)
-
     #locate runny executable
     exe_path = os.path.abspath(os.path.join("..", "build", "runny"))
     buildFile()
@@ -1303,10 +1303,45 @@ def on_batch_file_selected(sender, app_data):
     if selected_path:
         load_batch_file_to_workbench(selected_path)
 
-# Register file dialog component
+#batch file dialog
 with dpg.file_dialog(directory_selector=False,show=False,callback=on_batch_file_selected,tag="batch_file_dialog",width=700,height=400, default_path=default_batch_dir):
     dpg.add_file_extension(".json", color=[0, 255, 0, 255])
 
+def open_results_from_batch_file(sender, app_data):
+    #whenever user selects a batch config for the results
+    selected_file = app_data.get("file_path_name")
+    if not selected_file or not os.path.exists(selected_file):
+        return
+
+    try:
+        with open(selected_file, "r") as f:
+            batch_config = json.load(f)
+            
+        #open results dashboard
+        open_results_dashboard(batch_config)
+    except Exception as e:
+        spawn_message_modal("File Read Error", f"Could not load batch JSON:\n{e}", is_error=True)
+
+
+def create_results_file_dialog():
+    #spawn file dialog for results
+    default_batch_dir = os.path.abspath(os.path.join("..", "config", "batchConfig"))
+    os.makedirs(default_batch_dir, exist_ok=True)
+    tag_name = "open_results_file_dialog"
+    if dpg.does_item_exist(tag_name):
+        dpg.show_item(tag_name)
+        return
+
+    with dpg.file_dialog(
+        directory_selector=False,
+        show=True,
+        callback=open_results_from_batch_file,
+        tag=tag_name,
+        width=700,
+        height=400,
+        default_path=default_batch_dir
+    ):
+        dpg.add_file_extension(".json", color=[0, 255, 0, 255])
 
 #NOTE in dearpygui, windows are the main canvas, while viewports are the individual sections you see
 
@@ -1329,6 +1364,8 @@ with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title
             dpg.add_button(label="Open Batch Workbench Window", width=-1, height=50, callback=lambda: route_to_view("workbench_window"))
             dpg.add_spacer(height=10)
             dpg.add_button(label="Manage Global Infrastructure", width=-1, height=50, callback=lambda: route_to_view("config_manager_window"))
+            dpg.add_spacer(height = 10)
+            dpg.add_button(label="View Batch Results", width=-1, height=50, callback=create_results_file_dialog)
             dpg.add_spacer(height = 10)
         #right panel showing recent activity
         with dpg.child_window(width=-1, height=-1):
@@ -1448,6 +1485,193 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
 # ==============================
 
 
+# Global state to hold currently loaded batch results
+CURRENT_BATCH_RESULTS = {}
+ACTIVE_SIM_ID = None
+
+
+def render_left_metrics_pane(sim_data):
+    #refresh metric valus
+    metrics = sim_data.get("metrics", {})
+    trade_recs = metrics.get("Trade_records", {})
+    cagr = metrics.get("CAGR", 0.0)
+    tot_returns = metrics.get("totalReturns", 0.0)
+    num_trades = trade_recs.get("Number_of_trades", 0)
+    succ_trades = trade_recs.get("Successful_trades", 0)
+    unsucc_trades = trade_recs.get("Unsuccessful_trades", 0)
+    
+    win_rate = (succ_trades / num_trades * 100) if num_trades > 0 else 0.0
+
+    # Color helpers (Green for positive, Red for negative)
+    ret_color = [0, 255, 127] if tot_returns >= 0 else [255, 80, 80]
+
+    dpg.set_value("ui_val_cagr", f"{cagr:.2f}%")
+    dpg.set_value("ui_val_tot_returns", f"{tot_returns:.2f}%")
+    dpg.configure_item("ui_val_tot_returns", color=ret_color)
+    
+    dpg.set_value("ui_val_num_trades", str(num_trades))
+    dpg.set_value("ui_val_succ_trades", str(succ_trades))
+    dpg.set_value("ui_val_unsucc_trades", str(unsucc_trades))
+    dpg.set_value("ui_val_win_rate", f"{win_rate:.1f}%")
+
+import dearpygui.dearpygui as dpg
+
+def render_right_charts_pane(sim_data):
+    #render dearpygui plots
+    timeseries = sim_data.get("timeseries", {})
+    equities = timeseries.get("equities", [])
+    balances = timeseries.get("balances", [])
+    drawdowns = timeseries.get("drawdowns", [])
+    
+    #genereate x-axis indices
+    x_indices = list(range(len(equities)))
+
+    #clear previous charts
+    if dpg.does_item_exist("plot_render_group"):
+        dpg.delete_item("plot_render_group", children_only=True)
+
+    #push new plot elements into plot group
+    with dpg.group(parent="plot_render_group"):
+        if not equities:
+            dpg.add_text("No time-series bar data available for this simulation.", color=[255, 100, 100])
+            return
+
+        #equity and balance curve
+        with dpg.plot(label="Portfolio Value Over Time", height=350, width=-1):
+            dpg.add_plot_legend()
+            
+            #axes setup
+            dpg.add_plot_axis(dpg.mvXAxis, label="Time (Bars)")
+            y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="USD ($)")
+
+            #series rendering
+            dpg.add_line_series(x_indices, equities, label="Equity", parent=y_axis)
+            dpg.add_line_series(x_indices, balances, label="Cash Balance", parent=y_axis)
+
+        dpg.add_spacer(height=10)
+
+        #drawdown
+        with dpg.plot(label="Underwater Drawdown (%)", height=180, width=-1):
+            dpg.add_plot_axis(dpg.mvXAxis, label="Time (Bars)")
+            dd_y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="Drawdown %")
+
+            #rendered in red
+            dpg.add_line_series(x_indices, drawdowns, label="Drawdown", parent=dd_y_axis)
+
+def on_strategy_dropdown_changed(sender, app_data, user_data):
+    #dropdown for a different strategy
+    global ACTIVE_SIM_ID
+    ACTIVE_SIM_ID = app_data
+    if ACTIVE_SIM_ID in CURRENT_BATCH_RESULTS:
+        sim_data = CURRENT_BATCH_RESULTS[ACTIVE_SIM_ID]
+        render_left_metrics_pane(sim_data)
+        #chart updates here
+        render_right_charts_pane(sim_data)
+
+
+def open_results_dashboard(batch_config):
+    #main window to open
+    global CURRENT_BATCH_RESULTS, ACTIVE_SIM_ID
+
+    #load results
+    CURRENT_BATCH_RESULTS = core.load_batch_results(batch_config)
+    '''results = {
+        "sim_id": sim_id,
+        "metrics": {},
+        "timeseries": {
+            "dates": [],
+            "balances": [],
+            "equities": [],
+            "drawdowns": [],
+            "prices": []
+        },
+        "trades": []
+    }'''
+    
+    if not CURRENT_BATCH_RESULTS:
+        spawn_message_modal("Results Error", "No simulation output data found", is_error=True)
+        return
+
+    #get all the sim ids with the keys of results
+    sim_ids = list(CURRENT_BATCH_RESULTS.keys())
+    ACTIVE_SIM_ID = sim_ids[0]
+
+    #destroy window if it already exists
+    if dpg.does_item_exist("results_dashboard_window"):
+        dpg.delete_item("results_dashboard_window")
+
+    #spawn main window
+    with dpg.window(
+        label="Simulation Results",
+        tag="results_dashboard_window",
+        width=1100,
+        height=700,
+        pos=[50, 50],
+        on_close=lambda: dpg.delete_item("results_dashboard_window")
+    ):
+        #header bar
+        with dpg.group(horizontal=True):
+            batch_id = batch_config.get("simulation_metadata", {}).get("batch_id", "Unknown")
+            dpg.add_text(f"Batch ID: {batch_id}", color=[0, 200, 255])
+            dpg.add_spacer(width=30)
+            dpg.add_text("Select Strategy:")
+            dpg.add_combo(
+                items=sim_ids,
+                default_value=ACTIVE_SIM_ID,
+                callback=on_strategy_dropdown_changed,
+                width=200
+            )
+
+        dpg.add_separator()
+
+        #main two pane layout
+        with dpg.group(horizontal=True):
+            #left pane, metrics (1/3 width ~320)
+            with dpg.child_window(width=320, height=580, border=True):
+                dpg.add_text("Performance Metrics", color=[255, 200, 100])
+                dpg.add_separator()
+                
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Total Returns:")
+                    dpg.add_text("0.0%", tag="ui_val_tot_returns")
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("CAGR:")
+                    dpg.add_text("0.0%", tag="ui_val_cagr")
+
+                dpg.add_spacer(height=15)
+                dpg.add_text("Trade Statistics", color=[255, 200, 100])
+                dpg.add_separator()
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Total Trades:")
+                    dpg.add_text("0", tag="ui_val_num_trades")
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Win Rate:")
+                    dpg.add_text("0.0%", tag="ui_val_win_rate")
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Successful Trades:")
+                    dpg.add_text("0", tag="ui_val_succ_trades", color=[0, 255, 127])
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Unsuccessful Trades:")
+                    dpg.add_text("0", tag="ui_val_unsucc_trades", color=[255, 80, 80])
+
+            #right pane, chart container
+            with dpg.child_window(tag="right_plot_container", width=-1, height=580, border=True):
+                dpg.add_text("Timeseries Performance Plots", color=[255, 200, 100])
+                dpg.add_separator()
+                
+                #placeholder for charts
+                with dpg.group(tag="plot_render_group"):
+                    dpg.add_text("Charts will render here...", color=[150, 150, 150])
+
+    #render initial metrics
+    first_sim_data = CURRENT_BATCH_RESULTS[ACTIVE_SIM_ID]
+    render_left_metrics_pane(first_sim_data)
+    render_right_charts_pane(first_sim_data)
 
 # =============================================================
 # EXECUTION

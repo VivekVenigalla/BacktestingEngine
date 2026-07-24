@@ -3,6 +3,9 @@ import json
 import glob
 from datetime import datetime
 import subprocess
+import pandas as pd
+import csv
+import re
 
 #Get the important directories
 #dir name returns the parent directory
@@ -244,6 +247,126 @@ def perform_delete_feed(feed_id):
             os.remove(tempFile)
             print("File deleted successfully.")
 
+#sim results
+
+def get_latest_sim_file(output_dir, sim_id, file_key, extension):
+    #get the last ouput file matching the pattern with the highest num if available
+    #{sim_id}_{file_key}.{ext} or {sim_id}_{file_key}_{num}.{ext}
+
+    if not os.path.exists(output_dir):
+        return None
+
+    #?
+    pattern = re.compile(rf"^{re.escape(sim_id)}_{re.escape(file_key)}(?:_(\d+))?\.{extension}$")
+
+    #all possible files
+    candidate_files = []
+    for fname in os.listdir(output_dir):
+        match = pattern.match(fname)
+        if match:
+            # If there's an index number group, parse integer; otherwise index is 0
+            idx = int(match.group(1)) if match.group(1) is not None else 0
+            candidate_files.append((idx, os.path.join(output_dir, fname)))
+
+    if not candidate_files:
+        return None
+
+    #sort the candidates from highest to lowest and return the first value
+    candidate_files.sort(key=lambda x: x[0], reverse=True)
+    return candidate_files[0][1]
+
+
+def load_simulation_results(sim_id, output_dir=None):
+    """
+    Given a simulation ID (e.g., "sma_instance_246"), loads and parses:
+    1. Metric JSON -> {sim_id}_metricData_{num}.json
+    2. Dynamic Bar CSV -> {sim_id}_dynamicBar_{num}.csv
+    3. Trade Data CSV -> {sim_id}_tradeData_{num}.csv
+    """
+    #givena sim id, parse metric data, dynamic data, and trade data
+    #1. Metric JSON: {sim_id}_metricData_{num}.json
+    #2. Dynamic Bar CSV: {sim_id}_dynamicBar_{num}.csv
+    #3. Trade Data CSV: {sim_id}_tradeData_{num}.csv
+    if output_dir is None:
+        #resolves relative to src/ directory
+        output_dir = os.path.abspath(os.path.join("..", "output"))
+
+    results = {
+        "sim_id": sim_id,
+        "metrics": {},
+        "timeseries": {
+            "dates": [],
+            "balances": [],
+            "equities": [],
+            "drawdowns": [],
+            "prices": []
+        },
+        "trades": []
+    }
+
+    #get metric_path
+    metric_path = get_latest_sim_file(output_dir, sim_id, "metricData", "json")
+    #check if it exists
+    if metric_path and os.path.exists(metric_path):
+        try:
+            with open(metric_path, "r") as f:
+                results["metrics"] = json.load(f)
+        except Exception as e:
+            print(f"[Results Error] Failed to read metric JSON ({metric_path}): {e}")
+
+    #parse dynamic data
+    bar_path = get_latest_sim_file(output_dir, sim_id, "dynamicBar", "csv")
+    if bar_path and os.path.exists(bar_path):
+        try:
+            with open(bar_path, "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    results["timeseries"]["dates"].append(row.get("Date", ""))
+                    results["timeseries"]["balances"].append(float(row.get("Balance", 0)))
+                    results["timeseries"]["equities"].append(float(row.get("Equity", 0)))
+                    results["timeseries"]["drawdowns"].append(float(row.get("DrawDown", 0)))
+                    results["timeseries"]["prices"].append(float(row.get("BarClose", 0)))
+        except Exception as e:
+            print(f"[Results Error] Failed to parse dynamic bar CSV ({bar_path}): {e}")
+
+    #parse trade data
+    trade_path = get_latest_sim_file(output_dir, sim_id, "tradeData", "csv")
+    if trade_path and os.path.exists(trade_path):
+        try:
+            with open(trade_path, "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    #side == 0 -> buy else sell
+                    side_val = str(row.get("Side", "")).strip()
+                    side_label = "BUY" if side_val == "0" else "SELL"
+                    
+                    results["trades"].append({
+                        "id": row.get("TradeID"),
+                        "ticker": row.get("TickerID"),
+                        "price": float(row.get("ExecPrice", 0)),
+                        "side": side_label,
+                        "quantity": float(row.get("Quantity", 0)),
+                        "commission": float(row.get("Commission", 0)),
+                        "balance": float(row.get("CurrentBalance", 0)),
+                        "status": row.get("Status", "")
+                    })
+        except Exception as e:
+            print(f"[Results Error] Failed to parse trade CSV ({trade_path}): {e}")
+
+    return results
+
+def load_batch_results(batch_config, output_dir=None):
+    
+    #load performance data for all simulations in a batch
+    batch_results = {}
+    simulations = batch_config.get("simulations", [])
+    
+    for sim in simulations:
+        sim_id = sim.get("id")
+        if sim_id:
+            batch_results[sim_id] = load_simulation_results(sim_id, output_dir)
+            
+    return batch_results
 
 
 #when the file is imported this function is automatically runned

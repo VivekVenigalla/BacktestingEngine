@@ -1443,6 +1443,12 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
             with dpg.node_editor(tag="node_editor_canvas",callback=on_node_link_created, delink_callback=on_node_link_deleted):
                 pass
 
+# ==============================
+# VIEWPORT 4: BATCH RESULTS
+# ==============================
+
+
+
 # =============================================================
 # EXECUTION
 # =============================================================

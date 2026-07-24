@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
     //there will be one argument that is the JSON Path
 
     std::string argument = argv[1];
-    std::string JSON_PATH = "../config/batchConfig/" + argument;
+    std::string JSON_PATH =  argument;
     //connect to the file
     std::ifstream file(JSON_PATH);
 

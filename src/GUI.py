@@ -1242,12 +1242,12 @@ def run_simulation():
                 print("[Engine] Simulation failed.")
                 close_modal(logger_id)
                 dpg.split_frame()
-                spawn_message_modal("Execution Error", f"Simulation failed", error_msg = True)
+                spawn_message_modal("Execution Error", f"Simulation failed", is_error = True)
         except Exception as e:
             print(f"[Engine Crash] {e}")
             close_modal(logger_id)
             dpg.split_frame()
-            spawn_message_modal("Execution Error", f"Engine crash {e}", error_msg = True)
+            spawn_message_modal("Execution Error", f"Engine crash {e}", is_error = True)
 
     #locate runny executable
     exe_path = os.path.abspath(os.path.join("..", "build", "runny"))
@@ -1326,7 +1326,7 @@ with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title
         with dpg.child_window(width=320, height=-1):
             dpg.add_button(label="Open Batch File for Editing", width = -1, height = 50, callback=lambda: dpg.show_item("batch_file_dialog"))
             dpg.add_spacer(height=10)
-            dpg.add_button(label="+ Create New Simulation Batch", width=-1, height=50, callback=lambda: route_to_view("workbench_window"))
+            dpg.add_button(label="Open Batch Workbench Window", width=-1, height=50, callback=lambda: route_to_view("workbench_window"))
             dpg.add_spacer(height=10)
             dpg.add_button(label="Manage Global Infrastructure", width=-1, height=50, callback=lambda: route_to_view("config_manager_window"))
             dpg.add_spacer(height = 10)

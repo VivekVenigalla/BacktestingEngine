@@ -1,8 +1,8 @@
 {
     "simulation_metadata": {
-        "batch_id": "batch_123",
-        "notes": "",
-        "created_at": "2026-07-23 16:24:01"
+        "batch_id": "test_batch",
+        "notes": "For testing purposes",
+        "created_at": "2026-07-24 12:26:42"
     },
     "account": [
         {
@@ -13,32 +13,32 @@
     ],
     "broker": [
         {
-            "id": "basicBroker",
-            "commission_rate": 1,
-            "slippage_rate": 0.0005,
+            "id": "noSlipCommision",
+            "commission_rate": 0.0,
+            "slippage_rate": 0.0,
             "reset": true,
             "account_link": "basicAccount"
         }
     ],
     "data_feeds": [
         {
-            "id": "MSFT_1D_2024-01-01_2024-12-31",
-            "ticker": "MSFT",
+            "id": "TSLA_1D_2024-01-01_2024-12-31",
+            "ticker": "TSLA",
             "timeframe": "1D",
             "start_date": "2024-01-01",
             "end_date": "2024-12-31",
             "cagr_length": 1,
-            "csv_filepath": "../data/MSFT_1D_2024-01-01_2024-12-31.csv"
+            "csv_filepath": "../data/TSLA_1D_2024-01-01_2024-12-31.csv"
         }
     ],
     "simulations": [
         {
-            "id": "don_instance_241",
+            "id": "test_don",
             "strategy": "don",
             "account_link": "basicAccount",
-            "broker_link": "basicBroker",
-            "feed_ids": [
-                "MSFT_1D_2024-01-01_2024-12-31"
+            "broker_link": "noSlipCommision",
+            "feeds": [
+                "TSLA_1D_2024-01-01_2024-12-31"
             ],
             "parameters": {
                 "window": 20

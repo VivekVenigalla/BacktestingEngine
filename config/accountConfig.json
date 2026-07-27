@@ -19,6 +19,11 @@
             "id": "testAccount",
             "initial_balance": 12345.0,
             "reset": true
+        },
+        {
+            "id": "newAccount",
+            "initial_balance": 2000000.0,
+            "reset": true
         }
     ]
 }

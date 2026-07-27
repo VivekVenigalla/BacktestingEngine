@@ -1,0 +1,50 @@
+{
+    "simulation_metadata": {
+        "batch_id": "NVDA_batch",
+        "notes": "No Notes",
+        "created_at": "2026-07-26 12:41:57"
+    },
+    "account": [
+        {
+            "id": "newAccount",
+            "initial_balance": 2000000.0,
+            "reset": true
+        }
+    ],
+    "broker": [
+        {
+            "id": "basicBroker",
+            "commission_rate": 1,
+            "slippage_rate": 0.0005,
+            "reset": true,
+            "account_link": "newAccount"
+        }
+    ],
+    "data_feeds": [
+        {
+            "id": "NVDA_1D_2024-01-01_2024-12-31",
+            "ticker": "NVDA",
+            "timeframe": "1D",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "cagr_length": 1,
+            "csv_filepath": "../data/NVDA_1D_2024-01-01_2024-12-31.csv"
+        }
+    ],
+    "simulations": [
+        {
+            "id": "sma_instance_274",
+            "strategy": "sma",
+            "account_link": "newAccount",
+            "broker_link": "basicBroker",
+            "feeds": [
+                "NVDA_1D_2024-01-01_2024-12-31"
+            ],
+            "parameters": {
+                "fast_period": 50,
+                "slow_period": 200
+            },
+            "run_all_by_default": true
+        }
+    ]
+}

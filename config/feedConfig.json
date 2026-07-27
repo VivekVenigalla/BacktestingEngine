@@ -44,6 +44,15 @@
             "end_date": "2024-12-31",
             "cagr_length": 1,
             "csv_filepath": "../data/TSLA_1D_2024-01-01_2024-12-31.csv"
+        },
+        {
+            "id": "NVDA_1D_2024-01-01_2024-12-31",
+            "ticker": "NVDA",
+            "timeframe": "1D",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "cagr_length": 1,
+            "csv_filepath": "../data/NVDA_1D_2024-01-01_2024-12-31.csv"
         }
     ]
 }

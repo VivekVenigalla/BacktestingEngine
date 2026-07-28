@@ -2,12 +2,12 @@
     "simulation_metadata": {
         "batch_id": "NVDA_batch",
         "notes": "No Notes",
-        "created_at": "2026-07-26 12:41:57"
+        "created_at": "2026-07-28 11:11:23"
     },
     "account": [
         {
-            "id": "newAccount",
-            "initial_balance": 2000000.0,
+            "id": "testAccount",
+            "initial_balance": 12345.0,
             "reset": true
         }
     ],
@@ -17,7 +17,7 @@
             "commission_rate": 1,
             "slippage_rate": 0.0005,
             "reset": true,
-            "account_link": "newAccount"
+            "account_link": "testAccount"
         }
     ],
     "data_feeds": [
@@ -35,7 +35,7 @@
         {
             "id": "sma_instance_274",
             "strategy": "sma",
-            "account_link": "newAccount",
+            "account_link": "testAccount",
             "broker_link": "basicBroker",
             "feeds": [
                 "NVDA_1D_2024-01-01_2024-12-31"

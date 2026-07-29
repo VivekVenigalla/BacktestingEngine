@@ -1,5 +1,5 @@
 import dearpygui.dearpygui as dpg
-import core  # Safe import of core backend state and functions
+import core  #import core functions
 from csv_download import downloadData
 from datetime import datetime
 import math

@@ -8,7 +8,10 @@
 // min/max. With windowSize=4, the breakout logic first fires on the 5th
 // call, using the first 4 closes.
 TEST_CASE("donChannel places stop orders just outside the prior window's high/low", "[donchannel]") {
-    Account acct(10000.0);
+    // buyNewPosition spends cash immediately: balance becomes 20000 - 50*90 = 15500.
+    // (Chosen so the buy-stop and sell-stop quantities below come out different --
+    // if they coincidentally matched, a side/quantity mix-up bug could hide behind it.)
+    Account acct(20000.0);
     acct.buyNewPosition("AAPL", 50, 90.0); // shares available for the sell-stop
     std::unordered_map<std::string, Bar> bars;
     std::unordered_map<long int, Trade> history;
@@ -46,7 +49,7 @@ TEST_CASE("donChannel places stop orders just outside the prior window's high/lo
             foundBuyStop = true;
             REQUIRE(order.type == "stop");
             REQUIRE(order.checkPrice == Catch::Approx(105.01)); // 1 cent above the window high
-            REQUIRE(order.quantity == 18); // floor(10000*0.2/110)
+            REQUIRE(order.quantity == 28); // floor(15500*0.2/110), balance already reduced by the buyNewPosition above
         } else {
             foundSellStop = true;
             REQUIRE(order.type == "stop");

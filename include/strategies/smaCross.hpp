@@ -24,8 +24,8 @@ class smaCross : public Strategy{
         int slowLength = 200;
         int fastLength = 50;
 
-        double fastSum;
-        double slowSum;
+        double fastSum = 0.0;
+        double slowSum = 0.0;
         Order nextOrder;
         bool check = false;
         //implementing a queue allows for easy plug in and extraction so we dont have to iterate a lot.

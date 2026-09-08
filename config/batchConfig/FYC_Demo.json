@@ -1,0 +1,50 @@
+{
+    "simulation_metadata": {
+        "batch_id": "FYC_Demo",
+        "notes": "demo",
+        "created_at": "2026-09-01 15:04:21"
+    },
+    "account": [
+        {
+            "id": "basicAccount",
+            "initial_balance": 10000,
+            "reset": true
+        }
+    ],
+    "broker": [
+        {
+            "id": "basicBroker",
+            "commission_rate": 1,
+            "slippage_rate": 0.0005,
+            "reset": true,
+            "account_link": "basicAccount"
+        }
+    ],
+    "data_feeds": [
+        {
+            "id": "AAPL_1D_2015-1-11_2025-1-11",
+            "ticker": "AAPL",
+            "timeframe": "1D",
+            "cagr_length": 10,
+            "start_date": "2015-1-11",
+            "end_date": "2025-1-11",
+            "csv_filepath": "../data/AAPL_1D.csv"
+        }
+    ],
+    "simulations": [
+        {
+            "id": "sma_instance_256",
+            "strategy": "sma",
+            "account_link": "basicAccount",
+            "broker_link": "basicBroker",
+            "feeds": [
+                "AAPL_1D_2015-1-11_2025-1-11"
+            ],
+            "parameters": {
+                "fast_period": 10,
+                "slow_period": 50
+            },
+            "run_all_by_default": true
+        }
+    ]
+}

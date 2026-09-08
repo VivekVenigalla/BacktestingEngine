@@ -60,8 +60,10 @@ void Account::buyNewPosition(std::string ticker, long quantity, double entryPric
 }
 
 void Account::buyPositionQuantity(std::string ticker, long quantityChange, double entryPrice){
+    long oldQuantity = positions[ticker].quantity;
+    double oldAEP = positions[ticker].average_entry_price;
     positions[ticker].quantity += quantityChange;
-    positions[ticker].average_entry_price = (positions[ticker].average_entry_price + entryPrice)/2.0;
+    positions[ticker].average_entry_price = (oldQuantity*oldAEP + quantityChange*entryPrice) / (oldQuantity + quantityChange);
     balance -= quantityChange*entryPrice;
 }
 

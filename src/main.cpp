@@ -15,6 +15,7 @@
 #include "../include/simulationRunner.hpp"
 #include "../include/logger.hpp"
 #include "nlohmann/json.hpp"
+#include "projectPaths.hpp"
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -27,6 +28,11 @@ using json = nlohmann::json;
 int main(int argc, char* argv[]) {
     
     //there will be one argument that is the JSON Path
+
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <path-to-batch-config.json>" << std::endl;
+        return 1;
+    }
 
     std::string argument = argv[1];
     std::string JSON_PATH =  argument;
@@ -124,7 +130,7 @@ int main(int argc, char* argv[]) {
     double cagr;
 
     //create batch output directory
-    fs::path base_dir = fs::path("/Users/vivekvenigalla/Documents/VV_Active/03_PROJECTS/BacktestingEngine/output");
+    fs::path base_dir = fs::path(PROJECT_SOURCE_DIR) / "output";
     base_dir = base_dir / batchID;
     if(fs::create_directory(base_dir)){
         std::cout<<"Batch output directory created at: " << base_dir << std::endl;

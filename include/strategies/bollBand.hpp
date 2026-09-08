@@ -20,6 +20,8 @@ class bollBand : public Strategy{
         void runBar();
         void init();
         virtual ~bollBand() = default;
+
+        double standardDeviation(const std::queue<double>& nums, double average);
     private:
         //bollinger bands implement a 20 period windows, hence this is a const
         int windowSize = 20;
@@ -34,7 +36,5 @@ class bollBand : public Strategy{
         bool check = false;
         //implementing a queue allows for easy plug in and extraction so we dont have to iterate a lot.
         std::queue<double> Window;
-
-        double standardDeviation(std::queue<double> nums, double average);
 
 };

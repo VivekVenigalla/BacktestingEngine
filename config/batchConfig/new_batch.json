@@ -1,0 +1,50 @@
+{
+    "simulation_metadata": {
+        "batch_id": "new_batch",
+        "notes": "No Notes",
+        "created_at": "2026-08-20 15:31:58"
+    },
+    "account": [
+        {
+            "id": "basicAccount",
+            "initial_balance": 10000,
+            "reset": true
+        }
+    ],
+    "broker": [
+        {
+            "id": "basicBroker",
+            "commission_rate": 1,
+            "slippage_rate": 0.0005,
+            "reset": true,
+            "account_link": "basicAccount"
+        }
+    ],
+    "data_feeds": [
+        {
+            "id": "TSLA_1D_2024-01-01_2024-12-31",
+            "ticker": "TSLA",
+            "timeframe": "1D",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "cagr_length": 1,
+            "csv_filepath": "../data/TSLA_1D_2024-01-01_2024-12-31.csv"
+        }
+    ],
+    "simulations": [
+        {
+            "id": "sma_instance_285",
+            "strategy": "sma",
+            "account_link": "basicAccount",
+            "broker_link": "basicBroker",
+            "feeds": [
+                "TSLA_1D_2024-01-01_2024-12-31"
+            ],
+            "parameters": {
+                "fast_period": 10,
+                "slow_period": 50
+            },
+            "run_all_by_default": true
+        }
+    ]
+}

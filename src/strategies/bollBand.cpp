@@ -71,11 +71,11 @@ void bollBand::runBar(){
     
 }
 
-double bollBand::standardDeviation(std::queue<double> nums, double average){
+double bollBand::standardDeviation(const std::queue<double>& nums, double average){
     //since the queue cannot be easily iterated without destroying the original, we create a copy
     std::queue<double> numsCopy = nums;
     //iterate through the queue, finding the difference between the element and the mean
-    double temp;
+    double temp = 0.0;
     while(!numsCopy.empty()){
         temp += std::pow((numsCopy.front()-average), 2);
         numsCopy.pop();

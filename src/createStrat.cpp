@@ -2,6 +2,7 @@
 #include "../include/strategies/smaCross.hpp"
 #include "../include/strategies/bollBand.hpp"
 #include "../include/strategies/donChannel.hpp"
+#include <stdexcept>
 
 
 std::unique_ptr<Strategy> StrategyFactory::create(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::vector<std::string> symbols, std::string typeStrat, const json& config){//the config is the paramaters for the specific strat in the json file
@@ -21,5 +22,5 @@ std::unique_ptr<Strategy> StrategyFactory::create(Broker& b, Account& u, std::un
         return std::make_unique<donChannel>(b,u,cBs,history,symbols[0], window);
     }
 
-    return nullptr;
+    throw std::invalid_argument("Unknown strategy type: " + typeStrat);
 }

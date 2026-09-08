@@ -35,7 +35,7 @@ int Broker::createOrder(Order newOrder){
         tempTrade.ticker = newOrder.ticker;
         tempTrade.execPrice = 0.0;
         tempTrade.type = newOrder.type;
-        tempTrade.side = newOrder.quantity;
+        tempTrade.side = newOrder.side;
         tempTrade.quantity = newOrder.quantity;
         tempTrade.checkPrice = newOrder.checkPrice;
         tempTrade.filled = false;
@@ -54,13 +54,13 @@ void Broker::deleteOrder(int orderID, std::string reason){
     tempTrade.ticker = newOrder.ticker;
     tempTrade.execPrice = 0.0;
     tempTrade.type = newOrder.type;
-    tempTrade.side = newOrder.quantity;
+    tempTrade.side = newOrder.side;
     tempTrade.quantity = newOrder.quantity;
     tempTrade.checkPrice = newOrder.checkPrice;
     tempTrade.filled = false;
-    tempTrade.status = "ORDER " + std::to_string(tempID) + " CANCELLED : " + reason;
+    tempTrade.status = "ORDER " + std::to_string(orderID) + " CANCELLED : " + reason;
     //create trade history entry
-    history[tempID] = tempTrade;
+    history[orderID] = tempTrade;
     //erase the order
     orders.erase(orderID);
 }

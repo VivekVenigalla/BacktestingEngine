@@ -8,6 +8,7 @@ add_executable(unit_tests
     test_donchannel.cpp
     test_datafeed.cpp
     test_createstrat.cpp
+    test_logger.cpp
 )
 target_link_libraries(unit_tests PRIVATE backtest_core Catch2::Catch2WithMain)
 

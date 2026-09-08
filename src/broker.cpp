@@ -223,22 +223,20 @@ void Broker::processOrder(int id, Order order){
     //This implementation for the execPrice is shortsighted as we are using only 1 day intervals. change in the future
     if(order.type == "market"){
         if(order.side ==0){
-            currPrice = (currBar.open)*(1.0+slippageRate)+commisionFee;  
+            currPrice = (currBar.open)*(1.0+slippageRate)+commisionFee;
         }
         else{
-            currPrice = (currBar.open)*(1.0-slippageRate)-commisionFee; 
+            currPrice = (currBar.open)*(1.0-slippageRate)-commisionFee;
         }
-        tempTrade.execPrice = currPrice;  
     }
     else if(order.type == "limit"){
         if(order.side ==0){
             //execute the better price between the open and checkPrice
-            currPrice = (std::min(order.checkPrice, currBar.open))*(1.0+slippageRate)+commisionFee;  
+            currPrice = (std::min(order.checkPrice, currBar.open))*(1.0+slippageRate)+commisionFee;
         }
         else{
-            currPrice = (std::max(order.checkPrice, currBar.open))*(1.0-slippageRate)-commisionFee;   
+            currPrice = (std::max(order.checkPrice, currBar.open))*(1.0-slippageRate)-commisionFee;
         }
-        tempTrade.execPrice = currPrice; 
     }
     else{
         if(order.side ==0){

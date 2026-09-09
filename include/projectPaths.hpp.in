@@ -1,12 +1,18 @@
 #pragma once
 
-// This file is a TEMPLATE (.in). CMake's configure_file() reads it, replaces
-// the @VAR@ placeholders with real values, and writes the result to
-// build/generated/projectPaths.hpp -- a normal header that main.cpp/logger.cpp
-// can #include like any other. That generated file is why hardcoded absolute
-// paths don't need to live in checked-in source anymore: CMake bakes in the
-// correct path for wherever this project happens to be sitting on disk, at
-// build time, on whatever machine is doing the building.
+//this file is a TEMPLATE(.in). CMake's configure_file() reads it, replaces
+//the @VAR@ placeholders with real values, and writes the result to
+//build/generated/projectPaths.hpp -- a normal header that main.cpp/logger.cpp
+//can #include like any other. that generated file is why hardcoded absolute
+//paths don't need to live in checked-in source anymore: CMake bakes in the
+//correct path for wherever this project happens to be sitting on disk, at
+//build time, on whatever machine is doing the building
 
+//"inline constexpr" here means: constexpr is a value the compiler works out
+//at compile time rather than at runtime(this whole string is baked directly
+//into the compiled program), and inline is what makes it legal for this
+//constant to be defined in a header that gets #included into more than one
+//.cpp file, without the linker complaining about seeing the same definition
+//twice
 inline constexpr const char* PROJECT_SOURCE_DIR = "@PROJECT_SOURCE_DIR@";
 inline constexpr const char* TEST_FIXTURES_DIR = "@PROJECT_SOURCE_DIR@/tests/fixtures";

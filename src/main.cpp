@@ -1,3 +1,13 @@
+//this is the program's entry point - the one function every c++ program
+//must have, which the operating system calls first when you run ./runny.
+//everything else in the codebase is just building blocks; this file is
+//where they all actually get wired together and run for real
+//
+//the high-level flow: read a batch config json -> build shared Data feeds/
+//Accounts/Brokers from it -> for each simulation listed in the config,
+//build a Strategy + SimulationRunner and drive it to completion -> export
+//results. see simulationRunner.cpp's step() for what happens on each
+//individual bar within one simulation
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -25,8 +35,13 @@ using json = nlohmann::json;
 
 //no using namespace std to ensure readability
 
+//argc(argument count) and argv(argument vector) are how command-line
+//arguments reach a c++ program - argv[0] is always the program's own name/
+//path, argv[1] onward are whatever the user typed after it. running
+//"./runny myconfig.json" means argc==2, argv[0]=="./runny", argv[1]==
+//"myconfig.json"
 int main(int argc, char* argv[]) {
-    
+
     //there will be one argument that is the JSON Path
 
     if (argc < 2) {
@@ -45,10 +60,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     //create json object and move the file to the json object allowing for parsing
+    //"file >> config" reads the whole file and parses it as json in one
+    //step - the same >> operator you'd use to read a number or word from
+    //std::cin, just overloaded by the json library to understand json text
     json config;
     file >> config;
 
     //obtain batch id
+    //config["simulation_metadata"]["batch_id"] digs into nested json
+    //objects the same way you'd index nested dictionaries in most
+    //languages - .get<std::string>() then converts that json value into a
+    //real std::string
     std::string batchID = config["simulation_metadata"]["batch_id"].get<std::string>();
 
     //tickers and paths for the feed objects
@@ -63,6 +85,10 @@ int main(int argc, char* argv[]) {
     std::unordered_map<std::string, std::string> paths;
 
     //iterate over the feeds
+    //"for(auto& feed : config["data_feeds"])" walks every entry in the
+    //config's data_feeds json array, one at a time - same range-based for
+    //loop syntax used elsewhere in this codebase for vectors/maps, just
+    //over a json array here instead
     for (auto& feed : config["data_feeds"]) {
         //temporary feedID
         std::string feedID = feed["id"].get<std::string>();
@@ -76,10 +102,14 @@ int main(int argc, char* argv[]) {
     //each of the feed contains all of the bar data, which is used to drip the strategy the bar to simulate real time trading
     std::unordered_map<std::string, Data> feeds;
     //reserve puts away space for the amount of tickers, useful for larger simulations
-    feeds.reserve(tickers.size()); 
+    feeds.reserve(tickers.size());
 
     //iterate over the tickers map and create each feed
     //creating the feed will automatically parse the data given the paths
+    //.emplace(key, value) constructs the Data object directly inside the
+    //map, in place - this avoids building a separate Data object first and
+    //then copying it in, which matters here since building one already
+    //means parsing an entire csv file
     for (const auto& [key, value] : tickers) {
         feeds.emplace(key, Data{key, value, paths[key]});
     }
@@ -105,13 +135,13 @@ int main(int argc, char* argv[]) {
     for (auto& broker : config["broker"]) {
         std::string brokerID = broker["id"].get<std::string>();
         std::string acctLink = broker["account_link"].get<std::string>();
-        
+
         //broker id is not needed in the class
         allBrokers.emplace(brokerID, Broker(
             //brokerID,
-            allAccounts.at(acctLink), 
-            bars, 
-            broker["commission_rate"].get<double>(), 
+            allAccounts.at(acctLink),
+            bars,
+            broker["commission_rate"].get<double>(),
             broker["slippage_rate"].get<double>(),
             brokerID
         ));
@@ -122,6 +152,10 @@ int main(int argc, char* argv[]) {
     std::unordered_map<std::string, Logger> loggers;
     std::unordered_map<std::string, Metrics> calculators;
     //unique ptr allows for polymorphism
+    //storing std::unique_ptr<Strategy> here(rather than a plain Strategy)
+    //is what lets this one map hold a mix of different concrete strategy
+    //types(smaCross, bollBand, donChannel...) side by side, since they all
+    //inherit from the same Strategy base class
     std::unordered_map<std::string, std::unique_ptr<Strategy>> strategies;
 
     //calculator metrics
@@ -137,12 +171,19 @@ int main(int argc, char* argv[]) {
     }
 
     //core loop
+    //this is the main loop - it runs once per simulation listed in the
+    //config's "simulations" array, building a fresh Strategy+Logger+Metrics
+    //trio for each one and driving it to completion before moving to the next
     for (auto& sim : config["simulations"]) {
         //get important variables here
         std::string simID = sim["id"].get<std::string>();
         std::string stratType = sim["strategy"].get<std::string>();
         std::string acctLink = sim["account_link"].get<std::string>();
         std::string brokerLink = sim["broker_link"].get<std::string>();
+        //sim.value<bool>("run_all_by_default", true) reads that key as a
+        //bool if present, or just uses true if the key is missing entirely
+        //- same "give me this value or a fallback" idea as
+        //createStrat.cpp's config.value("position_size_pct", 0.2)
         bool runAll = sim.value<bool>("run_all_by_default", true);
 
         json accountConfig;
@@ -150,14 +191,14 @@ int main(int argc, char* argv[]) {
         for (const auto& acc : config["account"]) {
             if (acc.contains("id") && acc["id"] == acctLink) {
                 accountConfig = acc;
-                break; 
+                break;
             }
         }
 
         for (const auto& bro : config["broker"]) {
             if (bro.contains("id") && bro["id"] == brokerLink) {
                 brokerConfig = bro;
-                break; 
+                break;
             }
         }
 
@@ -166,6 +207,11 @@ int main(int argc, char* argv[]) {
         bool brokerReset = brokerConfig.value<bool>("reset", true);
 
         //.at() bypasses standard constructor requirements which gives an error
+        //.at(key) looks up a map entry and THROWS if the key doesn't
+        //exist, unlike operator[](used elsewhere in this file), which would
+        //silently create a new blank entry instead - .at() is used here on
+        //purpose, since a missing account_link/broker_link is a real
+        //config mistake worth failing loudly on, not silently ignoring
         Account& tempAccount = allAccounts.at(sim["account_link"].get<std::string>());
         Broker& tempBroker = allBrokers.at(sim["broker_link"].get<std::string>());
 
@@ -193,11 +239,15 @@ int main(int argc, char* argv[]) {
         Metrics& calculator = calculators.at(simID);
 
         //create strategy
+        //"sim.contains(...) ? sim["parameters"] : json::object()" is the
+        //ternary(conditional) operator - shorthand for an if/else that
+        //picks one of two values: use the sim's own "parameters" if it has
+        //any, otherwise fall back to an empty json object
         json stratParams = sim.contains("parameters") ? sim["parameters"] : json::object();
         strategies.emplace(simID, StrategyFactory::create(
             tempBroker, tempAccount, tempBars, historyRef, tempTickers, stratType, stratParams
         ));
-        
+
         auto& strategy = strategies[simID];
         strategy->init();
 
@@ -210,7 +260,7 @@ int main(int argc, char* argv[]) {
         double cagrLength = primaryFeedConfig["cagr_length"];
 
         //size_t is a storage method for the size of objects
-        size_t totalHistoricalBarsCount = feeds[primaryID].totalBars(); 
+        size_t totalHistoricalBarsCount = feeds[primaryID].totalBars();
 
         //create runner obect
         SimulationRunner runner(
@@ -223,6 +273,10 @@ int main(int argc, char* argv[]) {
             runner.runAll();
         }
         else{
+            //this branch is an interactive text menu - std::cin >> command
+            //blocks and waits for you to type something in the terminal
+            //and hit enter, letting you step through the simulation bar by
+            //bar by hand instead of running it all at once
             std::string command;
             while(!runner.getIsFinished()){
                 std::cout << "Controls: 's'=Step, 'n'=N Steps, 'd'=Run To Date, 'r'=Run All, 'q'=Skip -> Option: ";
@@ -230,22 +284,22 @@ int main(int argc, char* argv[]) {
                 //get the command and check based on the controls
                 if(command == "s") {
                     runner.step();
-                } 
+                }
                 else if(command == "n") {
                     size_t stepsCount;
                     std::cout << "Enter number of bars to process: ";
                     std::cin >> stepsCount;
                     runner.runSteps(stepsCount);
-                } 
+                }
                 else if(command == "d") {
                     std::string targetDateString;
                     std::cout << "Enter target window limit string (YYYY-MM-DD): ";
                     std::cin >> targetDateString;
                     runner.runToDate(targetDateString);
-                } 
+                }
                 else if(command == "r") {
                     runner.runAll();
-                } 
+                }
                 else if(command == "q") {
                     break;
                 }
@@ -253,7 +307,7 @@ int main(int argc, char* argv[]) {
                     std::cout << "Invalid input. Please try again" << "\n";
                 }
             }
-        
+
 
         }
         //reset account and broker

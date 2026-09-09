@@ -15,6 +15,10 @@ smaCross::smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& 
     }
 }
 
+//": smaCross(b, u, cBs, history, symbol, fast, slow)" here is constructor
+//delegation(c++11) - instead of repeating the fast/slow validation logic
+//above, this constructor just calls the other one first, then only adds
+//the one extra line(positionSizePct = posSizePct) it actually needs
 smaCross::smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow, double posSizePct) : smaCross(b, u, cBs, history, symbol, fast, slow){
     positionSizePct = posSizePct;
 }
@@ -42,8 +46,12 @@ void smaCross::runBar(){
 
     fastWindow.push(currPrice);
     slowWindow.push(currPrice);
-    
+
     //check if the queues are filled up and pop if necessary
+    //this is the incremental-average trick: instead of re-adding up every
+    //price in the window each bar(slow, gets slower as the window grows),
+    //just add the new price and subtract the one falling out of the window
+    //- the running sum stays correct in constant time per bar
     if(fastWindow.size() > fastLength){
         fastSum -= fastWindow.front();
         fastWindow.pop();
@@ -77,5 +85,5 @@ void smaCross::runBar(){
             broker.createOrder(nextOrder);
         }
     }
-    
+
 }

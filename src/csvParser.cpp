@@ -7,12 +7,14 @@
 
 
 std::map<std::string, Bar> Parser::parse(std::string ticker, std::string path){
-    
+
     //declare variables
     std::string row;
     std::map<std::string, Bar> data;
     //access the csv file for read only
     //to read and writ use fstream
+    //std::ifstream("input file stream") opens a file for reading - this is
+    //the standard c++ way to read a file, similar to python's open(path)
     std::ifstream file(path);
 
     //check if the file was accessed or not
@@ -22,29 +24,41 @@ std::map<std::string, Bar> Parser::parse(std::string ticker, std::string path){
     }
 
     //obtain the first line and print it for confirmation
+    //std::getline(file, row) reads one whole line from the file into row -
+    //this call skips over the csv header row(Date,Open,High,Low,Close,
+    //Volume) since nothing is done with it besides the sanity check below
     std::getline(file, row);//the s reads the line as a string
     //redo this
     if(row != " "){
         std::cout << "Parser functional...Now parsing...";
     }
 
+    //this loop condition also uses std::getline, but reads one DATA row at
+    //a time now, and keeps looping for as long as there are more lines left
     while(std::getline(file, row)){
         //although we have a row, we need to process it to get every individual enty data and ensure they are properly types
         //convert the row into a stringstream
+        //a stringstream lets you treat a string as if it were a stream(like
+        //a file) - that's what makes the getline calls below able to pull
+        //individual comma-separated fields back out of one row string
         std::stringstream ss(row);
-        
+
         //since not all of the types are the same, I have to manually do it.
-        
+
         std::string date_temp;
         std::string open_temp;
         std::string close_temp;
         std::string high_temp;
         std::string low_temp;
         std::string volume_temp;
-        
+
         Bar newBar;
 
-        //get each data point and 
+        //get each data point and
+        //this is a DIFFERENT overload of std::getline than the one used
+        //above to read a whole line - passing a third argument(',') makes
+        //it read up to the next comma instead of up to the next newline,
+        //which is what splits one csv row into its individual fields
         std::getline(ss, date_temp, ',');
         std::getline(ss, open_temp, ',');
         std::getline(ss, high_temp, ',' );
@@ -54,6 +68,9 @@ std::map<std::string, Bar> Parser::parse(std::string ticker, std::string path){
 
         newBar.ticker = ticker;
         newBar.date = date_temp;
+        //every field read above is a std::string, even the numeric ones -
+        //std::stod("string to double") and std::stol("string to long")
+        //convert that text into actual numbers Bar can store
         newBar.open = std::stod(open_temp);
         newBar.high = std::stod(high_temp);
         newBar.low = std::stod(low_temp);
@@ -63,16 +80,19 @@ std::map<std::string, Bar> Parser::parse(std::string ticker, std::string path){
 
         //vector implementation => data.push_back(newBar);
         data.insert({date_temp, newBar});
-        
+
     }
-    
+
     return data;
-    
+
 }
 
 //same function but with a placeholder ticker
+//identical logic to the parse() above, just always reading DATA_PATH and
+//tagging every Bar with the fixed "PLACE" ticker instead of a real one -
+//see the version above for line-by-line explanations
 std::map<std::string, Bar> Parser::parse(){
-    
+
     //declare variables
     std::string row;
     std::map<std::string, Bar> data;
@@ -98,19 +118,19 @@ std::map<std::string, Bar> Parser::parse(){
         //although we have a row, we need to process it to get every individual enty data and ensure they are properly types
         //convert the row into a stringstream
         std::stringstream ss(row);
-        
+
         //since not all of the types are the same, I have to manually do it.
-        
+
         std::string date_temp;
         std::string open_temp;
         std::string close_temp;
         std::string high_temp;
         std::string low_temp;
         std::string volume_temp;
-        
+
         Bar newBar;
 
-        //get each data point and 
+        //get each data point and
         std::getline(ss, date_temp, ',');
         std::getline(ss, open_temp, ',');
         std::getline(ss, high_temp, ',' );
@@ -129,9 +149,9 @@ std::map<std::string, Bar> Parser::parse(){
 
         //vector implementation => data.push_back(newBar);
         data.insert({date_temp, newBar});
-        
+
     }
-    
+
     return data;
-    
+
 }

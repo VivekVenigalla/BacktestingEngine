@@ -13,6 +13,10 @@
 //all orders are market
 //since market orders are executed at the open price, all orders are executed the day after the order us creared to prevent look ahead bias
 
+//"class smaCross : public Strategy" is how inheritance is written in c++ -
+//smaCross IS-A Strategy, it gets all of Strategy's protected fields(broker,
+//user, ticker, positionSizePct...) for free, and just has to fill in the
+//two pure virtual methods(runBar/init) that Strategy left blank
 class smaCross : public Strategy{
     public:
         smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol);
@@ -43,10 +47,16 @@ class smaCross : public Strategy{
         bool bracketPending = false;
         long bracketQuantity = 0;
         bool check = false;
+        //a queue is a first-in-first-out line - push() adds to the back,
+        //pop() removes from the front, front() peeks at the oldest item
+        //without removing it. that's exactly a sliding price window: push
+        //the newest price on, and once the window's full, pop the oldest
+        //one off. this beats storing the window in a vector and re-summing
+        //it every bar - see fastSum/slowSum below, which track the running
+        //total incrementally instead
         //implementing a queue allows for easy plug in and extraction so we dont have to iterate a lot.
         std::queue<double> fastWindow;
         std::queue<double> slowWindow;
 
-        
-        
+
 };

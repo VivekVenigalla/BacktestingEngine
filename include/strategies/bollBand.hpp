@@ -22,6 +22,10 @@ class bollBand : public Strategy{
         void init();
         virtual ~bollBand() = default;
 
+        //"const std::queue<double>&" takes the window by reference instead
+        //of copying it(cheaper), and const promises this function won't
+        //modify the caller's queue - it works on its own internal copy
+        //instead(see numsCopy in the .cpp)
         double standardDeviation(const std::queue<double>& nums, double average);
     private:
         //bollinger bands implement a 20 period windows, hence this is a const

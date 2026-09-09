@@ -21,6 +21,12 @@ class donChannel : public Strategy{
         //this breakout strategy implement a 20 period windows
         int windowSize = 20;
 
+        //heads up: these two are never actually used - runBar() computes
+        //the window's highest/lowest with LOCAL variables of the exact
+        //same names(see the "auto [lowest, highest] = ..." line in the
+        //.cpp), which shadow(hide) these member fields for the rest of
+        //that block. these pointers are always left null and never
+        //allocated - leftover from an earlier version of this strategy
         //pointer to the highest and lowest value
         double* highest;
         double* lowest;
@@ -32,6 +38,11 @@ class donChannel : public Strategy{
         Order highestOrder;
         Order lowestOrder;
         bool check = false;
+        //a vector here instead of a queue(unlike smaCross/bollBand's
+        //windows) because this strategy needs to scan the WHOLE window for
+        //its min/max every bar(see std::minmax_element in the .cpp), not
+        //just add/remove from the ends - a queue doesn't support that kind
+        //of full scan as conveniently as a vector does
         //implementing a queue allows for easy plug in and extraction so we dont have to iterate a lot.
         std::vector<double> Window;
 

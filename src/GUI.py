@@ -1,3 +1,17 @@
+#this is the GUI's entry point - running "python3 GUI.py" builds every
+#window/widget defined below(most of it at import time, not inside a
+#function - dearpygui builds its whole ui tree as a side effect of the code
+#in this file simply running top to bottom) and then hands control over to
+#dearpygui's own event loop at the very bottom(dpg.start_dearpygui()),
+#which is what actually keeps the window open and responds to clicks
+#
+#dearpygui itself: it's an "immediate-ish" ui library where you build a
+#tree of items(windows, buttons, text...) using "with" blocks that nest the
+#way the widgets visually nest, and every item can be given a unique "tag"
+#(a string or int id) so other code can find/update/delete it later by
+#name - that tag-based lookup(dpg.does_item_exist, dpg.get_value,
+#dpg.set_value, dpg.configure_item, dpg.delete_item...) is the core pattern
+#used throughout this whole file
 import dearpygui.dearpygui as dpg
 import core  #import core functions
 from csv_download import downloadData
@@ -10,6 +24,8 @@ import subprocess
 import threading
 import sys
 
+#every dearpygui program needs a context created before any ui items can be
+#built - this has to run once, near the top, before anything else below
 dpg.create_context()
 
 #active batch with a deafult id
@@ -21,6 +37,11 @@ active_batch = {
     "simulations": []
 }
 
+#NOTE in dearpygui, windows are the main canvas, while viewports are the individual sections you see
+#this project shows one of these three "windows"(really, full-screen pages)
+#at a time and hides the other two - see route_to_view() right below,
+#which is just a loop that shows the one matching target_window_tag and
+#hides everything else in this list
 windows = ["landing_hub_window", "workbench_window", "config_manager_window"]
 
 # =============================================================
@@ -31,8 +52,16 @@ windows = ["landing_hub_window", "workbench_window", "config_manager_window"]
 def route_to_view(target_window_tag):
     for view in windows:
         if dpg.does_item_exist(view):
+            #"show=(view == target_window_tag)" evaluates the comparison
+            #first(True/False) and passes that straight in as the show
+            #argument - a compact way of writing "show it if this is the
+            #target, hide it otherwise" without an if/else
             dpg.configure_item(view, show=(view == target_window_tag))
 def resize_windows_handler():
+    #keeps whichever "page" is currently visible sized to fill the actual
+    #os window - this runs once at startup and again every time the user
+    #resizes the app window(see dpg.set_viewport_resize_callback near the
+    #bottom of this file)
     w = max(dpg.get_viewport_width() - 16, 400)
     h = max(dpg.get_viewport_height() - 39, 300)
     for screen in windows:
@@ -45,13 +74,24 @@ def close_modal(modal_tag):
         dpg.delete_item(modal_tag)
 
 #create a message window for errors or messages
+#this one small function is reused everywhere in this file for every popup
+#- plain info messages, error messages, and yes/no confirmation dialogs are
+#all really just this same modal window with different buttons wired up,
+#instead of separate, hand-built windows for each case
 def spawn_message_modal(title, message, is_error=False, confirm_callback=None, callback_data=None, need_ok = False):
     #generate a unique integer ID
+    #dpg.generate_uuid() hands back a fresh, guaranteed-unique id - used as
+    #this modal's tag so multiple modals can exist without their tags
+    #colliding(you can't have two dearpygui items sharing one tag)
     modal_tag = dpg.generate_uuid()
-    
+
     #use a conditional statement to change the color if there is a error
     text_color = [255, 100, 100] if is_error else [255, 255, 255]
-    
+
+    #"with dpg.window(...):" opens a new window and makes everything
+    #indented underneath it a CHILD of that window - this nesting-by-
+    #indentation is how dearpygui builds up its whole visual tree
+    #throughout this file
     with dpg.window(label=title, tag=modal_tag, modal=True, show=True, no_collapse=True, no_resize=True, width=350):
         dpg.add_text(message, color=text_color, wrap=330)
         dpg.add_spacer(height=10)
@@ -61,11 +101,23 @@ def spawn_message_modal(title, message, is_error=False, confirm_callback=None, c
         with dpg.group(horizontal=True):
             #if we need a confirmation create confirmation buttons and cancel
             if confirm_callback:
+                #"def wrapper_yes():" defines a small function nested
+                #INSIDE another function - a closure. it can see and use
+                #confirm_callback/callback_data/modal_tag from the outer
+                #spawn_message_modal call even after that outer call has
+                #already returned, because python keeps those variables
+                #alive as long as something(the button's callback here)
+                #still references them
                 def wrapper_yes():
                     confirm_callback(callback_data)
                     dpg.delete_item(modal_tag)
-                    
+
                 dpg.add_button(label="Yes, Proceed", callback=wrapper_yes, width=160)
+                #"callback=lambda: dpg.delete_item(modal_tag)" is a lambda
+                #used as a one-line inline callback - same idea as
+                #wrapper_yes above, just short enough to skip giving it its
+                #own def/name. dearpygui calls whatever function you hand
+                #it to "callback" the moment that button is clicked
                 dpg.add_button(label="Cancel", callback=lambda: dpg.delete_item(modal_tag), width=160)
             elif is_error or need_ok:
                 #error notice message
@@ -75,13 +127,29 @@ def spawn_message_modal(title, message, is_error=False, confirm_callback=None, c
 
     vp_width = dpg.get_viewport_client_width()
     vp_height = dpg.get_viewport_client_height()
+    #"//" is integer(floor) division - vp_width // 2 always gives a whole
+    #number, since dpg.set_item_pos expects whole pixel coordinates rather
+    #than a fractional one like plain "/" division could produce
     dpg.set_item_pos(modal_tag, [vp_width // 2 - 175, vp_height // 2 - 75])
     return modal_tag
 
 # =============================================================
 # CONFIG MODALS
 # =============================================================
+#the next three modals(account/broker/feed) all follow the same "create OR
+#edit" pattern: user_data is None when creating something brand new, or the
+#existing object's dict when editing one(see the Edit buttons in
+#refresh_config_manager_tables further down, which pass the row's data in
+#as user_data) - is_edit just checks which situation this call is
 def spawn_create_account_modal(sender=None, app_data=None, user_data=None):
+    #every dearpygui callback function is expected to accept(sender,
+    #app_data, user_data) - sender is the tag of whatever item triggered
+    #the callback, app_data is event-specific data dearpygui passes
+    #automatically, and user_data is whatever you attached yourself when
+    #registering the callback(e.g "callback=spawn_create_account_modal,
+    #user_data=acct" further down in this file). the "=None" defaults let
+    #you also call this function directly with no arguments at all(e.g a
+    #plain button click with no user_data attached)
     close_modal("modal_create_account")
     is_edit = user_data is not None
     data = user_data
@@ -90,10 +158,19 @@ def spawn_create_account_modal(sender=None, app_data=None, user_data=None):
     init_reset = data["reset"] if is_edit else True
 
     with dpg.window(label="Create New Global Account", tag="modal_create_account", modal=True, width=350, height=200):
+        #every input widget below is given a fixed tag(e.g "m_acct_id") so
+        #the save() closure right after can read back whatever the user
+        #typed via dpg.get_value(tag) - dearpygui doesn't hand you the
+        #current value automatically, you always fetch it by tag when you
+        #need it
         dpg.add_input_text(label="Account ID", tag="m_acct_id", default_value=init_id)
         dpg.add_input_float(label="Initial Balance", tag="m_acct_bal", default_value=init_bal)
         dpg.add_checkbox(label="Reset", tag="m_acct_reset", default_value=init_reset)
-        
+
+        #save() is another closure(see wrapper_yes above for what that
+        #means) - it's defined here so it can reach is_edit/data from the
+        #enclosing spawn_create_account_modal call, and gets wired up as
+        #the Save button's callback a few lines down
         def save():
             new_acc = {
                 "id": dpg.get_value("m_acct_id"),
@@ -102,6 +179,10 @@ def spawn_create_account_modal(sender=None, app_data=None, user_data=None):
             }
             close_modal("modal_create_account")
             #split frame waits for the close call to finish
+            #dpg.split_frame() tells dearpygui "finish rendering the
+            #current frame before running anything else" - without it, a
+            #delete_item followed immediately by another window being
+            #shown can race against dearpygui's own rendering and glitch
             dpg.split_frame()
             logger_id = spawn_message_modal("Logger", "Checking for errors")
 
@@ -123,6 +204,12 @@ def spawn_create_account_modal(sender=None, app_data=None, user_data=None):
             #if it is a edit, find the account and save the new_acc into the config
             if is_edit:
                 #find the account with the id and fill in the new_acc with a enumerate loop
+                #enumerate(list) walks a list handing back both the index
+                #AND the item together(idx, a) - needed here specifically
+                #because a plain "for a in ...: a = new_acc" would only ever
+                #reassign the local loop variable, not the actual list
+                #entry; you need the index to overwrite the real slot in
+                #the list below
                 for idx, a in enumerate(core.state["registered_accounts"]["account"]):
                     if a["id"] == new_acc["id"]:
                         core.state["registered_accounts"]["account"][idx] = new_acc
@@ -132,12 +219,19 @@ def spawn_create_account_modal(sender=None, app_data=None, user_data=None):
             refresh_all_ui()
             close_modal(logger_id)
             dpg.split_frame()
-            logger_id = spawn_message_modal("Logger", f"Account {new_acc["id"]} saved", need_ok = True)  
-            
+            #f-strings can nest a plain double-quoted string INSIDE another
+            #double-quoted f-string like this(a python 3.12+ feature) -
+            #older python would need the inner quotes to be single quotes
+            #instead(f'Account {new_acc["id"]} saved') to avoid ending the
+            #string early
+            logger_id = spawn_message_modal("Logger", f"Account {new_acc["id"]} saved", need_ok = True)
+
         with dpg.group(horizontal=True):
             dpg.add_button(label="Save Object", callback=save)
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_account"))
 
+#same create/edit pattern as spawn_create_account_modal above - see that
+#one for what is_edit/get_value/split_frame/enumerate are doing here too
 def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
     close_modal("modal_create_broker")
     account_ids = []
@@ -148,6 +242,13 @@ def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
     init_id = data["id"] if is_edit else "newBroker"
     init_commission = data["commission_rate"] if is_edit else 1.0
     init_slippage = data["slippage_rate"] if is_edit else 0.0005
+    #heads up: this whole broker->account link ui was disabled(the combo
+    #box below and reading its value back into new_brk are both commented
+    #out) - a broker's account_link only actually gets attached later,
+    #implicitly, when the workbench canvas is compiled into a batch json
+    #(see parse_workbench_canvas's "brk_obj["account_link"] = acct_obj["id"]"
+    #line further down). that means editing a broker through THIS modal
+    #can silently drop an account_link a batch export had already set
     #init_account = data["account_link"] if is_edit else account_ids[0]
     init_reset = data["reset"] if is_edit else True
 
@@ -157,7 +258,7 @@ def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
         dpg.add_input_float(label="Slippage Rate", tag="m_brk_slip", default_value=init_slippage)
         #dpg.add_combo(label="Account Link", tag="m_brk_link", items = account_ids, default_value=init_account)
         dpg.add_checkbox(label="Reset", tag="m_brk_reset", default_value=init_reset)
-        
+
         def save():
             new_brk = {
                 "id": dpg.get_value("m_brk_id"),
@@ -211,11 +312,18 @@ def spawn_create_broker_modal(sender=None, app_data=None, user_data=None):
             dpg.add_button(label="Save Object", callback=save)
             dpg.add_button(label="Cancel", callback=lambda: close_modal("modal_create_broker"))
 
+#same create/edit pattern again, plus a date picker this time - dearpygui's
+#date picker widget hands back a dict{'month_day', 'month', 'year'} rather
+#than a python datetime, and quirkily counts years as an offset from
+#1900 and months starting at 0(january), so there's some format-juggling
+#below to convert to/from real "YYYY-MM-DD" strings the rest of the
+#project(and datetime.strptime, which parses a string into a real datetime
+#object using a format pattern) actually expects
 def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
     close_modal("modal_create_feed")
     is_edit = user_data is not None
     title = "Edit Data Feed Blueprint" if is_edit else "Create New Global Data Feed"
-    
+
     data = user_data
     init_tick = data["ticker"] if is_edit else "MSFT"
     init_tf = data["timeframe"] if is_edit else "1D"
@@ -255,16 +363,29 @@ def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
             raw_end = dpg.get_value("m_fd_end")
             
             #format since dear pygui starts years since 1900 and uses 0 indexed month
+            #the ":04d"/":02d" inside these f-string {} braces are format
+            #specs - "04d" pads a whole number out to 4 digits with leading
+            #zeros(so year 24 becomes "0024", not what we want here since
+            #+1900 already gives a real 4-digit year, but month/day both
+            #use "02d" to get "01" instead of a bare "1")
             start_str = f"{raw_start['year'] + 1900:04d}-{raw_start['month'] + 1:02d}-{raw_start['month_day']:02d}"
             end_str = f"{raw_end['year'] + 1900:04d}-{raw_end['month'] + 1:02d}-{raw_end['month_day']:02d}"
 
             #to get cagr length we need to parse the string as a datetime object and then use that to find the percentage of a year
             d1 = datetime.strptime(start_str, "%Y-%m-%d")
             d2 = datetime.strptime(end_str, "%Y-%m-%d")
+            #subtracting two datetimes gives a timedelta object; .days pulls
+            #the whole-number day count back out of it. abs() guards
+            #against a negative count if the dates were ever picked in the
+            #wrong order(start after end)
             days_between = abs((d2 - d1).days)
 
 
             #use math.ceil to use only integers for the length of years elapsed
+            #math.ceil always rounds UP to the next whole number(2.1
+            #becomes 3), unlike normal rounding - so even a date range one
+            #day over a full year counts as a full extra year for cagr
+            #purposes
             cagr_length = math.ceil((days_between/365.2425))
             new_fd = {
                 "id": dpg.get_value("m_fd_tick") + "_" + dpg.get_value("m_fd_tf") +  "_" +  start_str + "_" + end_str,
@@ -300,11 +421,17 @@ def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
                 return
 
             #check if the ticker is valid
+            #this makes an actual live network call to yahoo finance just
+            #to validate the ticker string is real BEFORE letting the user
+            #save the feed - a fake ticker like "ZZZZZ" won't error out
+            #immediately, it just comes back with an EMPTY dataframe(hist),
+            #which is why the emptiness check below is what catches it,
+            #not the try/except alone
             try:
                 checkTicker = yf.Ticker(new_fd["ticker"])
                 # Attempt to download a tiny sliver of historical data
                 hist = checkTicker.history(period="1d")
-                
+
                 # If the ticker is fake, the resulting dataframe will be empty
                 if hist.empty:
                     close_modal(logger_id)
@@ -336,6 +463,16 @@ def spawn_create_feed_modal(sender=None, app_data=None, user_data=None):
                             core.update_feed_config()
                             data_dir = os.path.join("..", "data")
                             os.makedirs(data_dir, exist_ok=True)
+                            #heads up, likely bug: user_data["csv_filepath"]
+                            #is already stored as a path like
+                            #"../data/MSFT_1D_....csv"(see how new_fd builds
+                            #it above), but data_dir here is ALSO "../data" -
+                            #joining them produces a doubled-up path like
+                            #"../data/../data/MSFT_....csv". the
+                            #os.path.exists check just below this likely
+                            #fails silently on that malformed path, meaning
+                            #the OLD csv file for an edited feed never
+                            #actually gets deleted
                             tempFile = user_data["csv_filepath"]
                             tempFile = os.path.join(data_dir, tempFile)
 

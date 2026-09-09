@@ -46,6 +46,14 @@ SimulationRunner::SimulationRunner(const std::string& id,
 
 }
 
+//this runs once per bar and is the heart of the whole simulation - the
+//ORDER of operations here is deliberate: the broker processes any orders
+//placed on the PREVIOUS bar first, using THIS bar's fresh price data, and
+//only after that does the strategy get to see this bar and decide on new
+//orders. that way an order the strategy places this bar can only ever fill
+//on some FUTURE bar, never on data that wouldn't really have existed yet
+//when a live trader would have placed it - this is what "avoiding lookahead
+//bias" means in practice
 void SimulationRunner::step(){
 	//prevent any data leak
     if (isFinished) return;
@@ -53,7 +61,7 @@ void SimulationRunner::step(){
     //update all bars and prices to the new feed bar
     for (const std::string& id : feedIDs){
         tempBars[id] = feeds[id].getBar();
-        bars[id] = tempBars[id]; 
+        bars[id] = tempBars[id];
         currPrices[id] = tempBars[id].close;
     }
 
@@ -64,19 +72,19 @@ void SimulationRunner::step(){
     //load the bar onto the strategy and run its logic
     strategy->loadBar();
     strategy->runBar();
-    
+
     //check the total equity and increment step
     double value = tempAccount.accountValue(currPrices);
     currentStep++;
 
     //output the current step and debugging info such as balance and total equity and date
     std::cout << "Sim[" << simID << "] Progress: " << currentStep << "/" << totalSteps
-              << " | Date: " << tempBars[primaryID].date 
+              << " | Date: " << tempBars[primaryID].date
               << " | Balance: " << tempAccount.checkBalance() << "| Total Equity: " << value << "\n";
 
     //log data
     tempLogger.logSnapshot(tempBars[primaryID].date,tempBars,tempAccount.checkBalance(), value, tempAccount.returnPositions(),calculator.drawDown(value));
-    
+
     //advance bar
     for (const auto& feedID : feedIDs){
     	feeds[feedID].nextBar();

@@ -19,8 +19,8 @@ void Logger::logSnapshot(std::string date, std::unordered_map<std::string, Bar> 
 
     //create a lookup entry for fast access
     lookupMap[date] = fullHistory.dates.size()-1;
-    
-    
+
+
 }
 
 void Logger::printSnapshot(std::string date){
@@ -35,9 +35,15 @@ void Logger::printAllSnapshots(){
 
 //filename requires a proper directory
 void Logger::exportCSV(fs::path filepath, std::string filename){
+    //ofstream("output file stream") opens a file for WRITING - the
+    //opposite of ifstream, which csvParser.cpp uses for reading
     //ofstream only allows writing to files
     std::ofstream file(filepath);
 
+    //"if(!file)" checks whether the file stream is in a good, usable
+    //state - file streams can be checked like a bool this way, and it
+    //comes back false if the file couldn't be opened/created(e.g the
+    //folder doesn't exist or there's no write permission)
     if(!file){
         std::cerr<<"File " << filename << " unable to be created. Terminating export..." << std::endl;
         return;
@@ -45,7 +51,7 @@ void Logger::exportCSV(fs::path filepath, std::string filename){
     else{
         //only focus on these values shown below, will look into position and bar values later
         file << "Date,Balance,Equity,DrawDown,Ticker,BarOpen,BarHigh,BarLow,BarClose,BarVolume,Quantity,AEP\n";
-        
+
         //loop through the vectors and input them one by one
         //for each ticker the csv has another row with the same date
         for(int i =0; i < fullHistory.dates.size(); i++){
@@ -92,6 +98,10 @@ void Logger::exportJSON(fs::path filepath, std::string filename, Metrics& calcul
     double sharpe = calculator.sharpeRatio(returns, 0.0, periodsPerYear);
     double sortino = calculator.sortinoRatio(returns, 0.0, periodsPerYear);
 
+    //benchmarkReturn needs the first and last logged bar's price - guarded
+    //by these empty-checks since a simulation with zero logged bars(or an
+    //empty first snapshot) would otherwise crash trying to read
+    //.front()/.begin() on an empty container
     double benchmark = 0.0;
     if(!fullHistory.bars.empty() && !fullHistory.bars.front().empty()){
         std::string primaryTicker = fullHistory.bars.front().begin()->first;
@@ -123,6 +133,9 @@ void Logger::exportJSON(fs::path filepath, std::string filename, Metrics& calcul
         metric["Trade_records"]["Win_rate"] = calculator.winRate();
         metric["Trade_records"]["Profit_factor"] = calculator.profitFactor();
 
+        //metric.dump(4) turns the json object into text, indented 4 spaces
+        //per level so the file is human-readable rather than one giant
+        //unbroken line
         //dump the json object in the file
         file << metric.dump(4);
         file.close();
@@ -155,7 +168,7 @@ void Logger::exportCSVTrade(fs::path filepath, std::string filename, std::unorde
     */
         //only focus on these values shown below, will look into position and bar values later
         file << "TradeID,TickerID,ExecPrice,Type,Side,Quantity,CheckPrice,Commission,Filled,Status,CurrentBalance\n";
-        
+
         //loop through the vectors and input them one by one
         //for each ticker the csv has another row with the same date
         for(auto& [key, value] : historyRef){
@@ -181,13 +194,19 @@ void Logger::exportCSVTrade(fs::path filepath, std::string filename, std::unorde
 void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::string batchID, double periodsPerYear){
 
     //path to the output folder
+    //fs::path(...) / "output" builds a path by joining pieces together with
+    //the operating system's own path separator, so this works correctly
+    //whether it runs on mac/linux(a/b/c) or windows(a\b\c)
     fs::path baseDir = fs::path(PROJECT_SOURCE_DIR) / "output";
     baseDir = baseDir / batchID;
-    
+
     //this is a temporary path with the simID
     fs::path targetFolder = baseDir / simID;
 
     //create the unique folder path by checking which name is available
+    //keeps appending _1, _2, _3... until it finds a folder name that
+    //doesn't already exist, so re-running the same sim never overwrites a
+    //previous run's output
     int counter = 1;
     std::string uniqueID = simID;
 
@@ -222,5 +241,3 @@ void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_
     std::cout << "All files successfully created in directory: " << targetFolder.string() << "\n";
 
 }
-
-

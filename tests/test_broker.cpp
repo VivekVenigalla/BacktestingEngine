@@ -2,22 +2,22 @@
 #include <catch2/catch_approx.hpp>
 #include "broker.hpp"
 
-// Trade::side is meant to hold a 0 (buy) / 1 (sell) flag, mirroring the
-// Order it came from. Broker::createOrder's failure branch and
-// Broker::deleteOrder both accidentally wrote the order's *quantity* into
-// that field instead. These two tests each use an order whose quantity is
-// deliberately different from its side, so a wrong assignment is obvious.
+//Trade::side is meant to hold a 0 (buy) / 1 (sell) flag, mirroring the
+//Order it came from. Broker::createOrder's failure branch and
+//Broker::deleteOrder both accidentally wrote the order's *quantity* into
+//that field instead. These two tests each use an order whose quantity is
+//deliberately different from its side, so a wrong assignment is obvious.
 
 TEST_CASE("createOrder logs the order's actual side (not its quantity) when the order fails validation", "[broker]") {
-    Account acct(10.0); // too little balance to afford the order below
-    std::unordered_map<std::string, Bar> bars; // empty: Broker will look up "AAPL" and get a zero-valued default Bar
+    Account acct(10.0); //too little balance to afford the order below
+    std::unordered_map<std::string, Bar> bars; //empty: Broker will look up "AAPL" and get a zero-valued default Bar
     Broker broker(acct, bars);
 
     Order order;
     order.ticker = "AAPL";
     order.type = "market";
-    order.side = 0; // buy
-    order.quantity = 500; // costs far more than the $10 balance -> checkOrder fails
+    order.side = 0; //buy
+    order.quantity = 500; //costs far more than the $10 balance -> checkOrder fails
     order.checkPrice = -1;
 
     int id = broker.createOrder(order);
@@ -28,30 +28,30 @@ TEST_CASE("createOrder logs the order's actual side (not its quantity) when the 
 }
 
 TEST_CASE("deleteOrder logs the order's actual side (not its quantity) when cancelling a pending order", "[broker]") {
-    Account acct(100000.0); // plenty of balance so the order below is accepted as pending
+    Account acct(100000.0); //plenty of balance so the order below is accepted as pending
     std::unordered_map<std::string, Bar> bars;
     Broker broker(acct, bars);
 
     Order order;
     order.ticker = "AAPL";
     order.type = "market";
-    order.side = 0; // buy
-    order.quantity = 42; // deliberately different from `side` so a mix-up is obvious
+    order.side = 0; //buy
+    order.quantity = 42; //deliberately different from `side` so a mix-up is obvious
     order.checkPrice = -1;
 
-    int id = broker.createOrder(order); // accepted -> lands in the pending orders map
+    int id = broker.createOrder(order); //accepted -> lands in the pending orders map
     broker.deleteOrder(id, "test cancellation");
     const Trade& logged = broker.returnHistory()[id];
 
-    // quantity==42 confirms the cancellation record actually landed under
-    // `id` (a missing/misfiled record would auto-vivify as a zero-valued
-    // Trade here instead, with quantity==0).
+    //quantity==42 confirms the cancellation record actually landed under
+    //`id` (a missing/misfiled record would auto-vivify as a zero-valued
+    //Trade here instead, with quantity==0).
     REQUIRE(logged.quantity == 42);
     REQUIRE(logged.side == 0);
 }
 
-// --- Baseline coverage: checkOrder's validation rules (not bugs, but worth
-// pinning down so a future change can't silently break them) ---
+//--- Baseline coverage: checkOrder's validation rules (not bugs, but worth
+//pinning down so a future change can't silently break them) ---
 
 TEST_CASE("checkOrder rejects a buy order when balance is insufficient", "[broker]") {
     Account acct(5.0);
@@ -67,12 +67,16 @@ TEST_CASE("checkOrder rejects a buy order when balance is insufficient", "[broke
 
     int id = broker.createOrder(order);
 
-    REQUIRE(broker.returnOrders().count(id) == 0); // never accepted as pending
+    //.count(id) on an unordered_map is a membership test - it returns how
+    //many entries have that key(0 or 1, since ids are unique here), so
+    //==0 means "no such id exists in this map". same idiom
+    //Account::checkPosition uses internally
+    REQUIRE(broker.returnOrders().count(id) == 0); //never accepted as pending
     REQUIRE(broker.returnHistory()[id].filled == false);
 }
 
 TEST_CASE("checkOrder rejects a sell order when shares are insufficient", "[broker]") {
-    Account acct(100000.0); // plenty of cash, but zero AAPL shares
+    Account acct(100000.0); //plenty of cash, but zero AAPL shares
     std::unordered_map<std::string, Bar> bars;
     Broker broker(acct, bars);
 
@@ -106,15 +110,15 @@ TEST_CASE("checkOrder rejects a zero-quantity order", "[broker]") {
     REQUIRE(broker.returnHistory()[id].filled == false);
 }
 
-// --- Baseline coverage: checkOrderLimitAndStop's trigger conditions, and
-// processOrder's execPrice math (slippage + commission), exercised together
-// through the public checkLoop() -- checkOrderLimitAndStop and processOrder
-// are private, so a pending order + checkLoop() is how the public API
-// exercises them. This also covers all three order types' execPrice,
-// standing in as the baseline test for the stop-order execPrice question
-// investigated during planning (a fallback assignment after the type
-// if/else already covers it -- there was no bug to fix, but this guards
-// against ever removing that fallback without noticing). ---
+//--- Baseline coverage: checkOrderLimitAndStop's trigger conditions, and
+//processOrder's execPrice math (slippage + commission), exercised together
+//through the public checkLoop() -- checkOrderLimitAndStop and processOrder
+//are private, so a pending order + checkLoop() is how the public API
+//exercises them. This also covers all three order types' execPrice,
+//standing in as the baseline test for the stop-order execPrice question
+//investigated during planning (a fallback assignment after the type
+//if/else already covers it -- there was no bug to fix, but this guards
+//against ever removing that fallback without noticing). ---
 
 TEST_CASE("processOrder fills pending orders via checkLoop with correct execPrice for every order type", "[broker]") {
     Bar bar;
@@ -126,26 +130,34 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
     bar.close = 102.0;
     bar.volume = 1000;
 
+    //declared const since neither value is meant to change across the
+    //SECTIONs below - a small guardrail against accidentally reassigning
+    //one inside a section and silently changing every other section's math
     const double commission = 1.0;
-    const double slippage = 0.01; // 1%, chosen for round numbers below
+    const double slippage = 0.01; //1%, chosen for round numbers below
 
     SECTION("market buy") {
         Account acct(100000.0);
         std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
         Broker broker(acct, bars, commission, slippage, "b");
 
+        //"Order{...}" aggregate-initializes an Order by listing its fields
+        //positionally(ticker, type, side, quantity, checkPrice, in that
+        //declaration order) - a shorthand for setting each field on its own
+        //line, used throughout this file for orders that don't need every
+        //field explained individually
         Order order{"AAPL", "market", 0, 10, -1};
         int id = broker.createOrder(order);
         broker.checkLoop();
 
         REQUIRE(broker.returnHistory()[id].filled == true);
-        // open*(1+slip)+commission = 100*1.01+1 = 102.0
+        //open*(1+slip)+commission = 100*1.01+1 = 102.0
         REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(102.0));
     }
 
     SECTION("market sell") {
         Account acct(100000.0);
-        acct.buyNewPosition("AAPL", 50, 90.0); // shares to sell
+        acct.buyNewPosition("AAPL", 50, 90.0); //shares to sell
         std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
         Broker broker(acct, bars, commission, slippage, "b");
 
@@ -153,7 +165,7 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         int id = broker.createOrder(order);
         broker.checkLoop();
 
-        // open*(1-slip)-commission = 100*0.99-1 = 98.0
+        //open*(1-slip)-commission = 100*0.99-1 = 98.0
         REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(98.0));
     }
 
@@ -162,12 +174,12 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
         Broker broker(acct, bars, commission, slippage, "b");
 
-        Order order{"AAPL", "limit", 0, 10, 98.0}; // low(95) <= 98 -> triggers
+        Order order{"AAPL", "limit", 0, 10, 98.0}; //low(95) <= 98 -> triggers
         int id = broker.createOrder(order);
         broker.checkLoop();
 
         REQUIRE(broker.returnHistory()[id].filled == true);
-        // min(checkPrice, open)*(1+slip)+commission = min(98,100)*1.01+1 = 99.98
+        //min(checkPrice, open)*(1+slip)+commission = min(98,100)*1.01+1 = 99.98
         REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(99.98));
     }
 
@@ -177,11 +189,11 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
         Broker broker(acct, bars, commission, slippage, "b");
 
-        Order order{"AAPL", "limit", 1, 10, 102.0}; // high(105) >= 102 -> triggers
+        Order order{"AAPL", "limit", 1, 10, 102.0}; //high(105) >= 102 -> triggers
         int id = broker.createOrder(order);
         broker.checkLoop();
 
-        // max(checkPrice, open)*(1-slip)-commission = max(102,100)*0.99-1 = 99.98
+        //max(checkPrice, open)*(1-slip)-commission = max(102,100)*0.99-1 = 99.98
         REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(99.98));
     }
 
@@ -190,12 +202,12 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
         Broker broker(acct, bars, commission, slippage, "b");
 
-        Order order{"AAPL", "stop", 0, 10, 104.0}; // high(105) >= 104 -> triggers
+        Order order{"AAPL", "stop", 0, 10, 104.0}; //high(105) >= 104 -> triggers
         int id = broker.createOrder(order);
         broker.checkLoop();
 
         REQUIRE(broker.returnHistory()[id].filled == true);
-        // max(checkPrice, open)*(1+slip)+commission = max(104,100)*1.01+1 = 106.04
+        //max(checkPrice, open)*(1+slip)+commission = max(104,100)*1.01+1 = 106.04
         REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(106.04));
     }
 
@@ -205,11 +217,11 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
         Broker broker(acct, bars, commission, slippage, "b");
 
-        Order order{"AAPL", "stop", 1, 10, 96.0}; // low(95) <= 96 -> triggers
+        Order order{"AAPL", "stop", 1, 10, 96.0}; //low(95) <= 96 -> triggers
         int id = broker.createOrder(order);
         broker.checkLoop();
 
-        // min(checkPrice, open)*(1-slip)-commission = min(96,100)*0.99-1 = 94.04
+        //min(checkPrice, open)*(1-slip)-commission = min(96,100)*0.99-1 = 94.04
         REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(94.04));
     }
 }
@@ -228,17 +240,17 @@ TEST_CASE("a limit order that hasn't reached its trigger price stays pending", "
     std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
     Broker broker(acct, bars);
 
-    Order order{"AAPL", "limit", 0, 10, 50.0}; // low(95) > 50 -> never triggers on this bar
+    Order order{"AAPL", "limit", 0, 10, 50.0}; //low(95) > 50 -> never triggers on this bar
     int id = broker.createOrder(order);
     broker.checkLoop();
 
-    REQUIRE(broker.returnOrders().count(id) == 1); // still pending
-    REQUIRE(broker.returnHistory().count(id) == 0); // no trade recorded yet
+    REQUIRE(broker.returnOrders().count(id) == 1); //still pending
+    REQUIRE(broker.returnHistory().count(id) == 0); //no trade recorded yet
 }
 
 TEST_CASE("processOrder computes realizedPnL for a sell relative to the pre-sale average entry price", "[broker]") {
     Account acct(100000.0);
-    acct.buyNewPosition("AAPL", 50, 90.0); // 50 shares @ AEP 90.0
+    acct.buyNewPosition("AAPL", 50, 90.0); //50 shares @ AEP 90.0
 
     Bar bar;
     bar.ticker = "AAPL";
@@ -257,7 +269,7 @@ TEST_CASE("processOrder computes realizedPnL for a sell relative to the pre-sale
         int id = broker.createOrder(order);
         broker.checkLoop();
 
-        // execPrice = open*(1-0) - 0 = 100.0; realizedPnL = (100-90)*20 = 200.0
+        //execPrice = open*(1-0) - 0 = 100.0; realizedPnL = (100-90)*20 = 200.0
         REQUIRE(broker.returnHistory()[id].realizedPnL == Catch::Approx(200.0));
     }
 
@@ -266,7 +278,7 @@ TEST_CASE("processOrder computes realizedPnL for a sell relative to the pre-sale
         int id = broker.createOrder(order);
         broker.checkLoop();
 
-        // realizedPnL = (100-90)*50 = 500.0
+        //realizedPnL = (100-90)*50 = 500.0
         REQUIRE(broker.returnHistory()[id].realizedPnL == Catch::Approx(500.0));
     }
 }

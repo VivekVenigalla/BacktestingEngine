@@ -11,9 +11,23 @@ TEST_CASE("StrategyFactory::create builds the concrete strategy matching the req
     Broker broker(acct, bars);
     std::vector<std::string> symbols{"AAPL"};
 
+    //SECTION splits one TEST_CASE into several related checks that share
+    //the setup above(the Account/Broker/symbols built before the first
+    //SECTION). catch2 actually re-runs the whole TEST_CASE body once per
+    //SECTION from the top, so each one gets fresh, independent copies of
+    //acct/bars/history/broker/symbols - a SECTION never sees leftover
+    //state from a previous SECTION
     SECTION("sma") {
         json params = {{"fast_period", 10}, {"slow_period", 30}};
         auto strat = StrategyFactory::create(broker, acct, bars, history, symbols, "sma", params);
+        //StrategyFactory::create returns a unique_ptr<Strategy> - the
+        //actual object underneath could be a smaCross, bollBand, or
+        //donChannel. dynamic_cast<smaCross*>(strat.get()) attempts to
+        //"downcast" it back to the specific subclass: it succeeds(returns
+        //a real pointer) only if the object genuinely IS a smaCross, and
+        //returns nullptr otherwise - a runtime type check, not something
+        //the compiler can verify ahead of time. .get() reads the raw
+        //pointer out of the unique_ptr without giving up ownership of it
         REQUIRE(dynamic_cast<smaCross*>(strat.get()) != nullptr);
     }
 
@@ -40,7 +54,7 @@ TEST_CASE("StrategyFactory::create threads position_size_pct through to the sizi
     json params = {{"fast_period", 2}, {"slow_period", 4}, {"position_size_pct", 0.5}};
     auto strat = StrategyFactory::create(broker, acct, bars, history, symbols, "sma", params);
 
-    // Same golden-cross series as test_smacross.cpp's golden-cross test
+    //Same golden-cross series as test_smacross.cpp's golden-cross test
     for (double close : {100.0, 100.0, 100.0, 140.0}) {
         Bar bar;
         bar.ticker = "AAPL";
@@ -56,8 +70,8 @@ TEST_CASE("StrategyFactory::create threads position_size_pct through to the sizi
 
     REQUIRE(broker.returnOrders().size() == 1);
     const Order& placed = broker.returnOrders().begin()->second;
-    // floor(10000 * 0.5 / 140) = 35 -- vs. floor(10000*0.2/140)=14 at the
-    // default 20%, confirming the config value actually changed the sizing.
+    //floor(10000 * 0.5 / 140) = 35 -- vs. floor(10000*0.2/140)=14 at the
+    //default 20%, confirming the config value actually changed the sizing.
     REQUIRE(placed.quantity == 35);
 }
 
@@ -69,6 +83,11 @@ TEST_CASE("StrategyFactory::create throws for an unrecognized strategy type", "[
     std::vector<std::string> symbols{"AAPL"};
     json params = json::object();
 
+    //REQUIRE_THROWS_AS(expression, ExceptionType) is a catch2 assertion
+    //built specifically for testing that something throws - it runs the
+    //expression, and passes only if it throws exactly(or derives from)
+    //ExceptionType. it fails the test both if nothing is thrown at all, AND
+    //if something of the wrong type is thrown instead
     REQUIRE_THROWS_AS(
         StrategyFactory::create(broker, acct, bars, history, symbols, "totally_unknown", params),
         std::invalid_argument

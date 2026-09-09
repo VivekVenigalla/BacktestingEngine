@@ -11,10 +11,23 @@
 
 //each order is correalated with an id that is auto generated
 
+//Broker is the "exchange" of this engine - a strategy hands it an Order,
+//and the broker decides whether/when it actually executes, then tells
+//Account to move the cash/shares. the strategy never talks to Account
+//directly - everything routes through here, which is what makes slippage,
+//commission, and fill rules live in one place instead of being reimplemented
+//by every strategy
 class Broker{
     //initialization of class: need account to connect to. Will also need a connection with a file that can feed in price data
     //for the time being assume that the price will be directly inputted into the functions
     public:
+        //Account& and the unordered_map& below are references, not copies -
+        //a reference is like a nickname for a variable that already exists
+        //somewhere else. writing "Account& account" as a parameter means
+        //this Broker doesn't get its own separate Account, it shares the
+        //exact same one the caller has - so when Broker changes the
+        //balance, the caller's Account object changes too, and there's no
+        //cost of copying the whole object on every call
         //the broker is connected to the account with no direct modifier so it can use its methods
         //since the broker has a reference to the currBars in main.cpp, there is no need for a function to assign the bar every main iteration
         Broker(Account& account, std::unordered_map<std::string,Bar>& connectBar);
@@ -35,12 +48,12 @@ class Broker{
 
         //main functions to be used by central governing script
         void checkLoop();
-        
+
         void reset();
         //getter methods
         std::unordered_map<long int, Trade>& returnHistory();
         std::unordered_map<long int, Order>& returnOrders();
-        
+
         std::string id;
     private:
 
@@ -58,11 +71,15 @@ class Broker{
         std::unordered_map<long int, Trade> history;
         std::unordered_map<std::string,Bar>& currBars;
 
+        //these three are private - only Broker's own methods above can call
+        //them. the strategy is only meant to create/delete orders and read
+        //back the results, never to reach in and decide "is this order
+        //valid" or "process this order" itself, so those steps are hidden
         bool checkOrder(Order& check);
 
         bool checkOrderLimitAndStop(Order check);
 
         void processOrder(int id, Order order);
-        
-        
+
+
 };

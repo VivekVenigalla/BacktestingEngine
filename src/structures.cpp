@@ -1,3 +1,7 @@
+//just the print() implementations for the structs declared in structures.hpp
+//these are debug helpers only(dumping a struct's fields to the console) -
+//none of them are used by the real backtest math, only for eyeballing state
+//while developing/troubleshooting
 #include "../include/structures.hpp"
 
 
@@ -35,6 +39,10 @@ void History::print_with_date(int index) const{
     std::cout<<"Date: " << dates[index] << std::endl;
 
     //iterate over all bar with tickers
+    //"auto& [key, value]" is a structured binding(c++17) - bars[index] is a
+    //map from ticker name to Bar, and this loop unpacks each map entry's
+    //key/value pair straight into two named variables instead of writing
+    //it.first/it.second like older c++ would require
     std::unordered_map<std::string, Bar> tempBars = bars[index];
     for(const auto& [key, value] : tempBars){
         value.print();

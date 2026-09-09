@@ -1,3 +1,10 @@
+#core.py is the bridge between the python gui and the c++ engine, but NOT
+#via any direct function calls or bindings - the two sides only ever talk
+#through files on disk. this file's job is: read/write the json config
+#files under config/ that GUI.py edits, and read back whatever csv/json
+#files the c++ binary(runny) wrote into output/ after a run finishes. the
+#actual "run the simulation" step happens elsewhere(GUI.py's run_simulation,
+#which shells out to the compiled runny executable as a separate process)
 import os
 import json
 import glob
@@ -9,6 +16,13 @@ import re
 
 #Get the important directories
 #dir name returns the parent directory
+#__file__ is a builtin variable python sets automatically to the path of
+#the currently-running script - os.path.abspath(__file__) turns that into
+#a full, unambiguous path, and dirname() strips the filename off the end,
+#leaving just the folder it lives in. building every other path FROM this
+#one(rather than a plain "../data" like the c++ side still does in a few
+#places) means these paths work correctly no matter what folder you were
+#in when you ran python, unlike a relative path which depends on that
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) #src/
 ROOT_DIR = os.path.dirname(BASE_DIR) #BacktestingEngine/
 CONFIG_DIR = os.path.join(ROOT_DIR, "config") #config/
@@ -17,6 +31,10 @@ OUTPUT_DIR = os.path.join(ROOT_DIR, "output")
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 
 #global variables that are accessed by gui
+#this dict is python's version of a shared, mutable global - every function
+#below that reads/writes "state" is reading/modifying this exact same
+#dictionary object, and so is GUI.py once it does "import core" and
+#accesses core.state. there's no copying going on, they all share one object
 state = {
     "registered_accounts": [],
     "registered_brokers": [],
@@ -29,8 +47,12 @@ def check_environment():
     #ensure that all paths exist and creates if necessary(useful in case of accidental deletions)
     for path in [CONFIG_DIR, BATCH_DIR, OUTPUT_DIR, DATA_DIR]:
         os.makedirs(path, exist_ok=True)
-        
+
     #in the event a config file does not exist make one with these default values
+    #this whole dict-of-dicts is just plain python data - config filename
+    #maps to the default content that should be written into it if it's
+    #ever missing, matching the same account/broker/feed/strategy json
+    #shapes the c++ side and GUI.py both expect
     default_blueprints = {
         "accountConfig.json": {
             "account" : [
@@ -72,25 +94,38 @@ def check_environment():
             ]
         }
     }
-    
+
     #iterate over the config files and create if needed
+    #.items() walks a dict as (key, value) pairs, same idea as the "auto&
+    #[key, value]" structured bindings the c++ side uses on its own maps
     for filename, structure in default_blueprints.items():
         #create full path
         target_path = os.path.join(CONFIG_DIR, filename)
         if not os.path.exists(target_path):
+            #"with open(path, 'w') as f:" is a context manager - it opens
+            #the file, runs the indented block below with f as the open
+            #file handle, and automatically closes the file afterward(even
+            #if an error happens inside the block). this is python's
+            #version of the RAII pattern the c++ side relies on for
+            #std::ifstream/std::ofstream to auto-close on scope exit
             #opens file
             with open(target_path, 'w') as f:
                 #json.dump literally dumps the dictionary
+                #json.dump writes a python dict straight out as json text -
+                #indent=4 just makes the file human-readable(4-space nested
+                #indentation) instead of one unbroken line
                 json.dump(structure, f, indent=4)
 
 #reload the registers for the gui
 def reload_registers():
     #make sure the directories exist first
     check_environment()
-    
+
     #get the objects
     try:
         #accounts
+        #json.load does the opposite of json.dump - reads json text out of
+        #an open file and parses it back into a python dict/list
         with open(os.path.join(CONFIG_DIR, "accountConfig.json"), 'r') as f:
             state["registered_accounts"] = json.load(f)
         #broker
@@ -101,6 +136,11 @@ def reload_registers():
             state["registered_feeds"] = json.load(f)
         with open(os.path.join(CONFIG_DIR, "strategyBlueprints.json"), 'r') as f:
             state["registered_strategies"] = json.load(f)
+    #"except Exception as e" catches any error raised inside the try block
+    #above(a missing file, invalid json, etc) and hands it to you as e,
+    #instead of letting the whole program crash - similar in spirit to
+    #c++'s try/catch, just catching a much broader base type here since
+    #this is meant to survive almost any parsing problem and keep running
     except Exception as e:
         print(f"Failed parsing standard registries: {e}")
 
@@ -110,12 +150,18 @@ def reload_registers():
     state["historical_batches"] = []
     #obtain all of the json files found in this directory
     #glob.glob allows the directory access for batch access
+    #glob.glob matches files by a wildcard pattern - "*.json" here means
+    #"every file in BATCH_DIR ending in .json", handing back a list of
+    #their full paths
     found_profiles = glob.glob(os.path.join(BATCH_DIR, "*.json"))
     #iterate over batches for loading
     for file_path in found_profiles:
         #get the filename eg batch_123.json
         raw_name = os.path.basename(file_path)
         #get last modified time for records
+        #os.path.getmtime returns a raw unix timestamp(seconds since 1970);
+        #datetime.fromtimestamp turns that into a real date/time object, and
+        #.strftime formats it into the readable "2024-01-01 14:30" string
         mod_stamp = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M")
         #remove the extension for batchID and save it in the dict with the timestamp
         state["historical_batches"].append({
@@ -126,17 +172,26 @@ def reload_registers():
 
 #save the batch into a file
 #NOTE : dict means the variable is a dictionary and -> str means the return type is a string. Useful for debugging
+#these are type hints - python doesn't actually enforce them at runtime(you
+#could still pass in something that isn't a dict and python wouldn't stop
+#you), they're purely documentation for humans and for tools like editors/
+#type checkers to catch mistakes before running the code
 def save_batch_config(batch_payload : dict) -> str:
     #get the batch_id  from the payload(the second parameter is the default value for the get function)
+    #dict.get(key, default) reads a value if the key exists, or hands back
+    #default instead of raising an error if it doesn't - same "safe lookup"
+    #idea as c++'s json.value(key, default) used on the createStrat.cpp side
     batch_id = batch_payload.get("simulation_metadata", {}).get("batch_id", "default_batch")
     #create the filepath
+    #an f-string("f'...{expr}...'") lets you drop a variable's value
+    #straight into a string without manually concatenating pieces together
     filepath = os.path.join(BATCH_DIR, f"{batch_id}.json")
-    
+
     #open the file if it exists and clear anything
     with open(filepath, 'w') as f:
         #dump the dictionary into the json file
         json.dump(batch_payload, f, indent=4)
-    
+
     #print confirmation and reload registers
     print(f"Batch saved to: {filepath}")
     reload_registers()
@@ -157,13 +212,13 @@ def save_account_config(new_account : dict):
 
     #create the filepath
     filepath = os.path.join(CONFIG_DIR, "accountConfig.json")
-    
+
     #open the file if it exists and clear anything
     #since we already have the updated dict in state, it is ok if the json is cleared
     with open(filepath, 'w') as f:
         #dump the dictionary into the json file
         json.dump(state["registered_accounts"], f, indent=4)
-    
+
     #print confirmation and reload registers
     print(f"Account saved")
     reload_registers()
@@ -182,13 +237,13 @@ def save_broker_config(new_broker : dict):
 
     #create the filepath
     filepath = os.path.join(CONFIG_DIR, "brokerConfig.json")
-    
+
     #open the file if it exists and clear anything
     #since we already have the updated dict in state, it is ok if the json is cleared
     with open(filepath, 'w') as f:
         #dump the dictionary into the json file
         json.dump(state["registered_brokers"], f, indent=4)
-    
+
     #print confirmation and reload registers
     print(f"Broker saved")
     reload_registers()
@@ -207,18 +262,23 @@ def save_feed_config(new_feed : dict):
 
     #create the filepath
     filepath = os.path.join(CONFIG_DIR, "feedConfig.json")
-    
+
     #open the file if it exists and clear anything
     #since we already have the updated dict in state, it is ok if the json is cleared
     with open(filepath, 'w') as f:
         #dump the dictionary into the json file
         json.dump(state["registered_feeds"], f, indent=4)
-    
+
     #print confirmation and reload registers
     print(f"Feed saved")
     reload_registers()
 
 def perform_delete_account(account_id):
+    #"[a for a in ... if ...]" is a list comprehension - a compact way to
+    #build a new list by filtering/transforming an existing one, instead of
+    #writing out a manual for-loop with .append() calls. this one keeps
+    #every account EXCEPT the one whose id matches account_id, effectively
+    #deleting it
     state["registered_accounts"]["account"] = [
         a for a in state["registered_accounts"]["account"] if a["id"] != account_id
     ]
@@ -231,6 +291,11 @@ def perform_delete_broker(broker_id):
     update_broker_config()
 
 def perform_delete_feed(feed_id):
+    #"next((... for ... in ... if ...), None)" finds just the FIRST item
+    #matching a condition, or None if nothing matches - the part in
+    #parentheses is a generator expression(like a list comprehension, but
+    #lazy/on-demand rather than building the whole list upfront), and
+    #next() pulls just one value out of it
     matchFeed = next((feed for feed in state["registered_feeds"]["data_feeds"] if feed["id"] == feed_id), None)
     state["registered_feeds"]["data_feeds"] = [
         f for f in state["registered_feeds"]["data_feeds"] if f["id"] != feed_id
@@ -254,6 +319,14 @@ def get_latest_sim_dir(output_dir, sim_id):
     if not os.path.exists(output_dir):
         return None
 
+    #re.compile builds a reusable regular expression("regex") - a
+    #pattern-matching tool for text. re.escape makes sure sim_id is treated
+    #as literal text even if it happens to contain regex-special characters.
+    #the rf"..." prefix combines a "raw" string(backslashes aren't treated
+    #specially, handy for regex syntax) with an f-string(so {} still
+    #substitutes sim_id in). the pattern itself means "sim_id, optionally
+    #followed by an underscore and some digits, and nothing else" - matching
+    #folder names like "sma_instance_274" or "sma_instance_274_2"
     pattern = re.compile(rf"^{re.escape(sim_id)}(?:_(\d+))?$")
     candidate_dirs = []
 
@@ -262,6 +335,10 @@ def get_latest_sim_dir(output_dir, sim_id):
         if os.path.isdir(full_path):
             match = pattern.match(item)
             if match:
+                #match.group(1) is whatever text the "(\d+)" part of the
+                #pattern captured(the trailing counter, if there was one) -
+                #None if that optional part wasn't present at all, meaning
+                #this is the very first/unsuffixed run, treated as index 0
                 idx = int(match.group(1)) if match.group(1) is not None else 0
                 candidate_dirs.append((idx, full_path))
 
@@ -269,6 +346,9 @@ def get_latest_sim_dir(output_dir, sim_id):
         return None
 
     #sort by descending order and return the path to the newest folder
+    #key=lambda x: x[0] tells sort "compare items by their first element(the
+    #idx number)" - a lambda is a small, throwaway, unnamed function, handy
+    #for a one-off rule like this that isn't worth writing a whole def for
     candidate_dirs.sort(key=lambda x: x[0], reverse=True)
     return candidate_dirs[0][1]
 
@@ -307,6 +387,11 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
     if os.path.exists(bar_path):
         try:
             with open(bar_path, "r") as f:
+                #csv.DictReader reads a csv file one row at a time, handing
+                #each row back as a dict keyed by the header column names -
+                #so row.get("Balance", 0) reads that row's Balance column
+                #without needing to track column positions by hand, unlike
+                #the c++ csvParser's manual comma-splitting approach
                 reader = csv.DictReader(f)
                 for row in reader:
                     results["timeseries"]["dates"].append(row.get("Date", ""))
@@ -325,6 +410,10 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
                 reader = csv.DictReader(f)
                 for row in reader:
                     side_val = str(row.get("Side", "")).strip()
+                    #"'BUY' if side_val == '0' else 'SELL'" is python's
+                    #ternary(conditional) expression - the same idea as
+                    #c++'s "cond ? a : b", just with the condition written
+                    #in the middle instead of at the front
                     side_label = "BUY" if side_val == "0" else "SELL"
                     results["trades"].append({
                         "id": row.get("TradeID"),
@@ -355,6 +444,13 @@ def load_batch_results(batch_config, output_dir=None):
     return batch_results
 
 
+#heads up: these next two lines run immediately the moment ANYTHING does
+#"import core" - not just when the gui actually needs the registries. that
+#means importing this module always does real disk i/o(reading every config
+#file) and always prints the entire state dict to the console as a side
+#effect, whether you wanted that or not(e.g in a test file that just needs
+#one function from this module). there's no "if __name__ == '__main__':"
+#guard here to prevent it
 #when the file is imported this function is automatically runned
 reload_registers()
 

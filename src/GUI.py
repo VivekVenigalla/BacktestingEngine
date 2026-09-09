@@ -1093,6 +1093,11 @@ def parse_workbench_canvas():
         return None, "Cannot build batch: No strategy nodes placed on canvas."
 
     compiled_simulations = []
+    #a set() automatically de-duplicates whatever you add to it - used here
+    #(rather than a list) because the same account/broker/feed can be
+    #reused by multiple strategy nodes on the canvas, and each one should
+    #only end up once in the final exported batch json, not once per
+    #strategy that references it
     compiled_accounts = set()
     compiled_brokers = set()
     compiled_feeds = set()
@@ -1130,6 +1135,13 @@ def parse_workbench_canvas():
         if brk_acct_obj["id"] != acct_obj["id"]:
             return None, f"Mismatched Accounts! Strategy '{strat_data.get('display_name')}' is linked to Account '{acct_obj['id']}', but Broker '{brk_obj['id']}' is linked to Account '{brk_acct_obj['id']}'."
 
+        #this is where a broker actually gets its account_link set - see
+        #spawn_create_broker_modal's heads-up comment above: the modal's own
+        #account-link ui is disabled, so THIS line, run at export time, is
+        #the only place a broker's account_link ever gets attached. since
+        #brk_obj is the exact same dict object stored in broker_nodes(python
+        #dicts are mutable and passed by reference, not copied), mutating it
+        #here also updates what's already sitting in used_broker_objs below
         brk_obj["account_link"] = acct_obj["id"]
         used_broker_objs[brk_obj["id"]] = brk_obj
         #validate feed links and feedNum
@@ -1201,9 +1213,14 @@ def parse_workbench_canvas():
 # =============================================================
 
 #add entity to node bench in view 3
+#this is the callback behind every "+ ..." button in the left sidebar(see
+#refresh_registry_sidepane right below) - user_data is a 2-item tuple
+#("ACCOUNT"/"BROKER"/"FEED"/"STRATEGY", the actual data dict), packed
+#together when each button is created, and unpacked back apart here
 def add_entity_to_batch(sender, app_data, user_data):
     entity_type, entity_data = user_data
-    
+
+
     if entity_type == "ACCOUNT":
         spawn_account_node(entity_data)
     elif entity_type == "BROKER":
@@ -1216,6 +1233,11 @@ def add_entity_to_batch(sender, app_data, user_data):
     print(f"[UI] Spawned {entity_type} Node: {entity_data['id']}")
 
 #refresh sidepane in view 3
+#rebuilds the "Node Library" sidebar buttons from scratch every time it's
+#called(delete everything currently there, then re-add one button per
+#registered account/broker/feed/strategy) - simpler to reason about than
+#trying to add/remove individual buttons to match whatever changed, at the
+#cost of a bit of redundant work on every refresh
 def refresh_registry_sidepane():
     #accounts
     if dpg.does_item_exist("reg_accounts_container"):
@@ -1291,6 +1313,10 @@ def refresh_strategy_table():
                     dpg.add_text(f" >= {abs(feedNum)}")
                 
                 #format parameters
+                #str.join(list) glues a list of strings together with the
+                #given separator between each one - here turning a list
+                #comprehension of formatted "name (type=default)" strings
+                #into one single ", "-separated display string
                 params_str = ", ".join(
                     [f"{p['name']} ({p['type']}={p['default']})" for p in strat.get("parameters", [])]
                 )
@@ -1303,23 +1329,33 @@ def refresh_config_manager_tables():
         #delete thr rows only
         for item in dpg.get_item_children("table_accounts", 1):
             dpg.delete_item(item)
-            
+
         for acct in core.state["registered_accounts"].get("account", []):
+            #"with dpg.table_row(...):" adds one new row to the table, and
+            #every dpg.add_text/add_button underneath becomes one cell in
+            #that row, left to right - matching the add_table_column calls
+            #that defined this table's columns further down in VIEWPORT 2
             with dpg.table_row(parent="table_accounts"):
                 dpg.add_text(acct["id"])
                 dpg.add_text(f"${acct['initial_balance']}")
                 dpg.add_text(str(acct["reset"]))
                 with dpg.group(horizontal=True):
                     dpg.add_button(label="Edit", callback=spawn_create_account_modal, user_data=acct)
+                    #"lambda s, a, u: ..." spells out all three callback
+                    #parameters(sender, app_data, user_data) explicitly,
+                    #even though only u(user_data) is actually used - this
+                    #is required because dearpygui always calls a callback
+                    #with all three positional arguments, so a lambda
+                    #accepting fewer than three would error out when clicked
                     dpg.add_button(
-                        label="Delete", 
+                        label="Delete",
                         callback=lambda s, a, u: spawn_message_modal(
-                            "Delete Account", 
-                            f"Delete account '{u}'?", 
+                            "Delete Account",
+                            f"Delete account '{u}'?",
                             is_error=True,
-                            confirm_callback=delete_account, 
+                            confirm_callback=delete_account,
                             callback_data=u
-                        ), 
+                        ),
                         user_data=acct["id"]
                     )
 
@@ -1375,6 +1411,9 @@ def refresh_config_manager_tables():
 
     refresh_strategy_table()
 
+#"test" here is just a generic [filepath, batch_config] pair(see the
+#confirm_callback wiring in export_batch_json below) - not a unit test,
+#the name is just a leftover placeholder from development
 def export_confirm(test):
     try:
         dpg.split_frame()
@@ -1383,9 +1422,15 @@ def export_confirm(test):
             json.dump(test[1], f, indent=4)
 
         #refresh registries(such as state)
+        #hasattr(object, "name") checks whether an object has an
+        #attribute/method with that name WITHOUT calling it - a defensive
+        #check here in case core.py's module-level code ever failed to
+        #fully load(so core.reload_registers might not exist), rather than
+        #assuming it's always safe to call
         if hasattr(core, "reload_registers"):
             core.reload_registers()
-            
+
+
         refresh_all_ui()
         close_modal(logger_id)
         spawn_message_modal("Batch Exported", f"Batch configuration successfully saved to:\n{test[0]}", need_ok = True)
@@ -1425,6 +1470,16 @@ def export_batch_json():
         close_modal(logger_id)
         export_confirm(test)
 
+#this is where the python gui actually reaches the compiled c++ engine -
+#and it does so with NO direct function calls or language bindings at all.
+#it shells out to two separate external programs via subprocess.run(a
+#function that launches another program and waits for it to finish,
+#exactly like typing a command in a terminal yourself): first "cmake
+#--build" to rebuild runny from the latest source, then runny itself with
+#the batch json's path as its one command-line argument(the same argv[1]
+#main.cpp reads). all python and c++ ever exchange is that file path in,
+#and whatever files runny writes to output/ once it's done - see core.py's
+#load_simulation_results for the other half of that contract
 def run_simulation():
 
     batchFile = dpg.get_value("ui_batch_id") or "batch_001"
@@ -1443,18 +1498,34 @@ def run_simulation():
         build_path = os.path.abspath(os.path.join("..", "build"))
         try:
             print("Building project...")
+            #the list ["cmake", "--build", "../build"] is the command and
+            #its arguments, spelled out as separate list items rather than
+            #one shell string - this avoids shell-injection risk entirely,
+            #since nothing here ever gets interpreted by a shell.
+            #check=True makes subprocess.run RAISE an exception
+            #(CalledProcessError, caught below) if the command exits with a
+            #non-zero(failure) status, instead of silently continuing
             subprocess.run(
-                ["cmake", "--build", "../build"], 
+                ["cmake", "--build", "../build"],
                 check=True
             )
             print("Build completed successfully!")
 
 
         except subprocess.CalledProcessError as e:
+            #"file=sys.stderr" sends this print to the error stream instead
+            #of standard output - the usual convention for error messages,
+            #keeping them separately identifiable from normal program output
             print(f"Error during CMake execution: {e}", file=sys.stderr)
             spawn_message_modal("Build Error", f"Error during CMake execution: {e}", is_error = True)
             return
     #execute runny
+    #this whole function runs on a SEPARATE thread(see threading.Thread
+    #below) so the actual backtest - which can take a while - doesn't
+    #freeze the entire gui while it runs. capture_output=True grabs the
+    #engine's stdout/stderr as text instead of letting it print straight to
+    #the terminal, and text=True decodes it as a normal string rather than
+    #raw bytes
     def engine_thread_task():
         print(f"[Engine] Starting simulation using: {temp_filepath}")
         try:
@@ -1462,10 +1533,21 @@ def run_simulation():
             dpg.split_frame()
             logger_id = spawn_message_modal("Logger", f"Running Simulation")
             process = subprocess.run([exe_path, temp_filepath], capture_output=True, text=True)
-            
+
+            #a process's returncode is 0 on success, nonzero on failure -
+            #the same exit-code convention main.cpp's own "return 0;"/
+            #"return 1;" statements produce
             if process.returncode == 0:
                 print(f"[Engine Output]\n{process.stdout}")
                 # Note: If you want to spawn a modal here, it must be thread-safe or queued
+                #heads up: this comment is a real, acknowledged risk, not
+                #just a note - dearpygui's ui functions generally aren't
+                #meant to be called from any thread other than the main
+                #one, but spawn_message_modal/close_modal ARE being called
+                #from this background thread right here anyway. it works
+                #in practice most of the time, but isn't guaranteed safe -
+                #a proper fix would queue these ui updates to run on the
+                #main thread instead of calling them directly from here
                 print("[Engine] Simulation completed successfully!")
                 close_modal(logger_id)
                 dpg.split_frame()
@@ -1485,7 +1567,14 @@ def run_simulation():
     #locate runny executable
     exe_path = os.path.abspath(os.path.join("..", "build", "runny"))
     buildFile()
- 
+
+    #threading.Thread(target=fn) creates a new thread that will run fn();
+    #daemon=True marks it as a background thread that python is allowed to
+    #kill automatically when the main program exits, so a still-running
+    #simulation can't keep the whole gui process alive after you close the
+    #window. .start() actually begins running it - engine_thread_task
+    #starts executing concurrently with the rest of the gui from this
+    #point on, not immediately when the Thread object was created
     engine_thread = threading.Thread(target=engine_thread_task, daemon=True)
     engine_thread.start()
 
@@ -1495,14 +1584,25 @@ def refresh_all_ui():
     refresh_config_manager_tables()
 
 #themes for entire window
+#"with dpg.theme() as global_theme:" both creates a theme item AND assigns
+#it to the python variable global_theme in one line("as" works the same
+#way here as it does on a "with open(...) as f:" file handle) - style
+#values set inside theme_component(dpg.mvAll) apply to every widget in the
+#whole app, since mvAll means "all widget types", rather than needing to
+#style each button/window individually
 with dpg.theme() as global_theme:
     with dpg.theme_component(dpg.mvAll):
         dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 14, 14, category=dpg.mvThemeCat_Core)
         dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 6, category=dpg.mvThemeCat_Core)
         dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 8, category=dpg.mvThemeCat_Core)
+#bind_theme actually applies the theme built above to the whole application
 dpg.bind_theme(global_theme)
 
 #keyboard configs
+#a handler_registry is dearpygui's way of listening for input that isn't
+#tied to one specific widget(a key press anywhere, rather than a click on
+#one particular button) - add_key_press_handler(mvKey_Back, ...) wires the
+#backspace/delete key up to delete_selected_canvas_items globally
 def setup_canvas_keyboard_handlers():
     #allows deleting hotkey
     if not dpg.does_item_exist("canvas_handler_registry"):
@@ -1514,7 +1614,11 @@ def delete_selected_canvas_items():
     #allows to delete visually selected items
     if not dpg.does_item_exist("node_editor_canvas"):
         return
-        
+
+    #the node editor tracks its own "currently selected"(clicked/
+    #ctrl-clicked) nodes and wires internally - these two calls just ask it
+    #for that current selection, rather than this code needing to track
+    #selection state itself
     selected_nodes = dpg.get_selected_nodes("node_editor_canvas")
     selected_links = dpg.get_selected_links("node_editor_canvas")
     
@@ -1531,12 +1635,20 @@ default_batch_dir = os.path.abspath(os.path.join("..", "config/batchConfig"))
 
 os.makedirs(default_batch_dir, exist_ok=True)
 
+#dpg.file_dialog's callback receives an app_data DICT(unlike most other
+#widgets, where app_data is just the new value) with details about
+#whatever the user picked - "file_path_name" is the full path to the
+#selected file
 def on_batch_file_selected(sender, app_data):
     selected_path = app_data.get("file_path_name")
     if selected_path:
         load_batch_file_to_workbench(selected_path)
 
 #batch file dialog
+#this file_dialog is built ONCE here at import time(tag="batch_file_dialog",
+#show=False) rather than freshly created every time it's needed - other
+#code just calls dpg.show_item("batch_file_dialog") to reveal this same,
+#already-built dialog(see the landing hub button further down)
 with dpg.file_dialog(directory_selector=False,show=False,callback=on_batch_file_selected,tag="batch_file_dialog",width=700,height=400, default_path=default_batch_dir):
     dpg.add_file_extension(".json", color=[0, 255, 0, 255])
 
@@ -1581,6 +1693,19 @@ def create_results_file_dialog():
 # =============================================================
 # VEIEWPORTS
 # =============================================================
+#everything from here down to EXECUTION at the very bottom of the file runs
+#immediately at import time(these "with dpg.window(...):" blocks are not
+#inside any function), building the STATIC shell of all four pages once -
+#the actual DYNAMIC content(table rows, sidebar buttons, node canvas
+#contents) is deliberately left empty here and filled in later by the
+#refresh_*() functions defined earlier in this file, called once real data
+#is available(see refresh_all_ui() near the very bottom)
+#
+#"width=-1"/"height=-1" is a dearpygui convention meaning "stretch to fill
+#whatever space is left in the parent", rather than a literal negative
+#pixel size - used throughout these viewports so panels resize sensibly
+#instead of needing a hardcoded pixel size that would only look right at
+#one specific window size
 
 # ================================
 # VIEWPORT 1: LANDING PAGE
@@ -1590,6 +1715,10 @@ with dpg.window(tag="landing_hub_window", no_move=True, no_resize=True, no_title
     dpg.add_separator()
     dpg.add_spacer(height=10)
     with dpg.group(horizontal=True):
+        #child_window creates a scrollable sub-panel inside the current
+        #window - used throughout this file to split one page into
+        #independently-sized/scrolled regions(here, a fixed-width left
+        #action panel next to a flexible-width right activity panel)
         #left panel containg quick actions such as creating a batch or manageing global config
         with dpg.child_window(width=320, height=-1):
             dpg.add_button(label="Open Batch File for Editing", width = -1, height = 50, callback=lambda: dpg.show_item("batch_file_dialog"))
@@ -1621,6 +1750,10 @@ with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_ti
     dpg.add_separator()
     dpg.add_spacer(height=10)
     
+    #tab_bar/tab give you the familiar clickable-tabs ui(only one tab's
+    #contents visible at a time) - each dpg.table below is created empty
+    #(just column headers via add_table_column) and gets its actual rows
+    #filled in later by refresh_config_manager_tables()
     with dpg.tab_bar():
         # Accounts Tab
         with dpg.tab(label="Accounts"):
@@ -1659,6 +1792,11 @@ with dpg.window(tag="config_manager_window", no_move=True, no_resize=True, no_ti
         # Strategies Blueprint Tab (Immutable)
         with dpg.tab(label="Strategies"):
             dpg.add_spacer(height=5)
+            #two string literals sitting next to each other with nothing
+            #but whitespace between them get automatically joined into one
+            #single string at parse time - this is just a plain string,
+            #split across two lines purely for readability in the source,
+            #not two separate arguments
             dpg.add_text(
                 "Strategy Blueprints(Read Only). These correspond to C++ files in the /strategies folder."
                 "Parameters can be customized when added to the Node Workbench.",
@@ -1695,13 +1833,21 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
             
             dpg.add_text("Node Library", color=[100, 255, 100])
             dpg.add_separator()
-            
+
+            #collapsing_header is the expandable/collapsible section widget
+            #(click the label to fold it away) - each one here wraps an
+            #EMPTY group with a fixed tag("reg_accounts_container" etc);
+            #"pass" is python's "do nothing" placeholder statement, needed
+            #here only because a "with" block can't have an empty body.
+            #these groups start empty on purpose and get their actual
+            #button contents added later by refresh_registry_sidepane(),
+            #which looks them up by these exact same tags
             with dpg.collapsing_header(label="Accounts"):
                 with dpg.group(tag="reg_accounts_container"): pass
-                
+
             with dpg.collapsing_header(label="Brokers"):
                 with dpg.group(tag="reg_brokers_container"): pass
-                
+
             with dpg.collapsing_header(label="Data Feeds"):
                 with dpg.group(tag="reg_feeds_container"): pass
 
@@ -1709,6 +1855,11 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
                 with dpg.group(tag="reg_strategies_container"): pass
 
         #node editor
+        #this is the actual node-editor widget the spawn_*_node functions
+        #earlier in this file all target via parent="node_editor_canvas" -
+        #its own callback/delink_callback are what dearpygui calls
+        #automatically when the user draws or removes a wire, wiring
+        #straight into on_node_link_created/on_node_link_deleted
         with dpg.child_window(width=-1, height=-1):
             with dpg.node_editor(tag="node_editor_canvas",callback=on_node_link_created, delink_callback=on_node_link_deleted):
                 pass
@@ -1716,9 +1867,18 @@ with dpg.window(tag="workbench_window", no_move=True, no_resize=True, no_title_b
 # ==============================
 # VIEWPORT 4: BATCH RESULTS
 # ==============================
-
+#unlike viewports 1-3, this one isn't a static window built once at import
+#time - open_results_dashboard() further down builds this whole window
+#fresh, from scratch, every time you actually want to look at a batch's
+#results, since which simulations exist to show only becomes known once a
+#specific batch's output has been loaded
 
 # Global state to hold currently loaded batch results
+#module-level(not inside a function) variables like these two are how this
+#file's callbacks share state - render_left_metrics_pane, the strategy
+#dropdown's callback, and open_results_dashboard all read/write the same
+#CURRENT_BATCH_RESULTS/ACTIVE_SIM_ID rather than passing this data around
+#as function arguments everywhere
 CURRENT_BATCH_RESULTS = {}
 ACTIVE_SIM_ID = None
 
@@ -1732,12 +1892,19 @@ def render_left_metrics_pane(sim_data):
     num_trades = trade_recs.get("Number_of_trades", 0)
     succ_trades = trade_recs.get("Successful_trades", 0)
     unsucc_trades = trade_recs.get("Unsuccessful_trades", 0)
-    
+
+    #heads up: this recomputes win rate by hand from the raw trade counts -
+    #metricData.json now actually includes a ready-made "Win_rate" field
+    #directly(see Logger::exportJSON on the c++ side), so this could be
+    #simplified to metrics.get("Trade_records", {}).get("Win_rate", 0.0)
+    #instead. this python code predates that field being added
     win_rate = (succ_trades / num_trades * 100) if num_trades > 0 else 0.0
 
     # Color helpers (Green for positive, Red for negative)
     ret_color = [0, 255, 127] if tot_returns >= 0 else [255, 80, 80]
 
+    #":.2f" is a format spec meaning "fixed-point, 2 digits after the
+    #decimal" - so 5.126 becomes the string "5.13", not the full raw float
     dpg.set_value("ui_val_cagr", f"{cagr:.2f}%")
     dpg.set_value("ui_val_tot_returns", f"{tot_returns:.2f}%")
     dpg.configure_item("ui_val_tot_returns", color=ret_color)
@@ -1747,16 +1914,29 @@ def render_left_metrics_pane(sim_data):
     dpg.set_value("ui_val_unsucc_trades", str(unsucc_trades))
     dpg.set_value("ui_val_win_rate", f"{win_rate:.1f}%")
 
+#heads up: this re-import is a vestigial copy-paste artifact - "import
+#dearpygui.dearpygui as dpg" already happened once at the very top of this
+#file, and python simply reuses the same already-loaded module the second
+#time rather than re-importing anything, so this line is harmless but
+#serves no purpose here
 import dearpygui.dearpygui as dpg
 
+#dpg.plot/add_plot_axis/add_line_series are dearpygui's own native charting
+#widgets - a genuinely different rendering path from the matplotlib-based
+#plotter.py script, but showing the same kind of equity-curve/drawdown data
 def render_right_charts_pane(sim_data):
     #render dearpygui plots
     timeseries = sim_data.get("timeseries", {})
     equities = timeseries.get("equities", [])
     balances = timeseries.get("balances", [])
     drawdowns = timeseries.get("drawdowns", [])
-    
+
     #genereate x-axis indices
+    #range(n) generates the whole numbers 0,1,2,...,n-1 lazily(on demand);
+    #wrapping it in list() forces all of them out into a real list right
+    #away - here just used as plain "bar number" x-axis values, one per
+    #equity point, since there's no per-bar date array plumbed through to
+    #this chart
     x_indices = list(range(len(equities)))
 
     #clear previous charts
@@ -1793,6 +1973,13 @@ def render_right_charts_pane(sim_data):
 
 def on_strategy_dropdown_changed(sender, app_data, user_data):
     #dropdown for a different strategy
+    #by default, assigning to a name inside a function creates a NEW local
+    #variable, even if a module-level(global) variable with that same name
+    #already exists - "global ACTIVE_SIM_ID" tells python "no, when this
+    #function assigns to ACTIVE_SIM_ID, modify the real module-level one
+    #from VIEWPORT 4's setup, don't shadow it with a local". reading a
+    #global's value(like CURRENT_BATCH_RESULTS just below) never needs this
+    #declaration, only reassigning it does
     global ACTIVE_SIM_ID
     ACTIVE_SIM_ID = app_data
     if ACTIVE_SIM_ID in CURRENT_BATCH_RESULTS:
@@ -1802,12 +1989,24 @@ def on_strategy_dropdown_changed(sender, app_data, user_data):
         render_right_charts_pane(sim_data)
 
 
+#builds the whole VIEWPORT 4 window fresh(unlike viewports 1-3, this one
+#doesn't exist until you actually have results to show) - called either
+#right after a simulation finishes(from run_simulation's engine_thread_task)
+#or when you open an existing batch's results from the landing hub
 def open_results_dashboard(batch_config):
     #main window to open
+    #two names after "global", comma-separated - both CURRENT_BATCH_RESULTS
+    #and ACTIVE_SIM_ID get reassigned in this function, so both need
+    #declaring(see on_strategy_dropdown_changed above for what global does)
     global CURRENT_BATCH_RESULTS, ACTIVE_SIM_ID
 
     #load results
     CURRENT_BATCH_RESULTS = core.load_batch_results(batch_config)
+    #this triple-quoted block isn't disabled code(compare to
+    #csv_download.py's use of the same syntax) - it's purely left here as
+    #inline documentation, reminding a reader what shape each entry in
+    #CURRENT_BATCH_RESULTS actually has, matching the "results" dict
+    #core.load_simulation_results builds and returns
     '''results = {
         "sim_id": sim_id,
         "metrics": {},
@@ -1820,7 +2019,7 @@ def open_results_dashboard(batch_config):
         },
         "trades": []
     }'''
-    
+
     if not CURRENT_BATCH_RESULTS:
         spawn_message_modal("Results Error", "No simulation output data found", is_error=True)
         return
@@ -1834,6 +2033,10 @@ def open_results_dashboard(batch_config):
         dpg.delete_item("results_dashboard_window")
 
     #spawn main window
+    #on_close is a special dearpygui callback that fires when the user
+    #clicks this specific window's own close button(the x in its title
+    #bar) - wired here to actually delete the window item, otherwise
+    #closing it would just hide it and leave it sitting around in memory
     with dpg.window(
         label="Simulation Results",
         tag="results_dashboard_window",
@@ -1848,6 +2051,9 @@ def open_results_dashboard(batch_config):
             dpg.add_text(f"Batch ID: {batch_id}", color=[0, 200, 255])
             dpg.add_spacer(width=30)
             dpg.add_text("Select Strategy:")
+            #add_combo is a dropdown selector - items is the list of
+            #choices shown, and picking one fires on_strategy_dropdown_
+            #changed with the picked string as app_data
             dpg.add_combo(
                 items=sim_ids,
                 default_value=ACTIVE_SIM_ID,
@@ -1896,11 +2102,16 @@ def open_results_dashboard(batch_config):
             with dpg.child_window(tag="right_plot_container", width=-1, height=580, border=True):
                 dpg.add_text("Timeseries Performance Plots", color=[255, 200, 100])
                 dpg.add_separator()
-                
+
                 #placeholder for charts
                 with dpg.group(tag="plot_render_group"):
                     dpg.add_text("Charts will render here...", color=[150, 150, 150])
 
+    #every "0.0%"/"0"-tagged text item above(ui_val_tot_returns,
+    #ui_val_cagr, etc) is just a static placeholder - render_left_metrics_
+    #pane/render_right_charts_pane below immediately overwrite them with
+    #the real numbers via dpg.set_value(tag, ...), the instant this window
+    #finishes being built
     #render initial metrics
     first_sim_data = CURRENT_BATCH_RESULTS[ACTIVE_SIM_ID]
     render_left_metrics_pane(first_sim_data)
@@ -1909,6 +2120,11 @@ def open_results_dashboard(batch_config):
 # =============================================================
 # EXECUTION
 # =============================================================
+#everything above this point only BUILT the ui tree - nothing is actually
+#visible or interactive yet until these last few lines run. this is the
+#standard dearpygui startup sequence: create_viewport makes the actual os
+#window, setup_dearpygui finalizes internal state, and show_viewport makes
+#it visible on screen
 dpg.create_viewport(title='Backtesting Engine', width=1300, height=840)
 dpg.setup_dearpygui()
 dpg.show_viewport()
@@ -1917,8 +2133,19 @@ dpg.set_viewport_resize_callback(resize_windows_handler)
 resize_windows_handler()
 
 # Render side-pane contents from core.state safely
+#this is the moment the static shell built by the VIEWPORT blocks above
+#finally gets populated with real data - everything before this line
+#exists, but the tables/sidebar are still empty until refresh_all_ui()
+#actually runs
 refresh_all_ui()
 setup_canvas_keyboard_handlers()
 
+#dpg.start_dearpygui() hands control over to dearpygui's own event loop -
+#this call BLOCKS(doesn't return) for as long as the window stays open,
+#continuously redrawing frames and dispatching clicks/keypresses to
+#whatever callbacks were registered throughout this whole file. once the
+#user closes the window, start_dearpygui finally returns and
+#destroy_context cleans up dearpygui's internal state before the program
+#actually exits
 dpg.start_dearpygui()
 dpg.destroy_context()

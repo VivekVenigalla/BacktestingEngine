@@ -74,3 +74,82 @@ TEST_CASE("drawDown(currPrices) values the account before comparing to the peak"
     // (10200-10500)/10500*100
     REQUIRE(calc.drawDown(pricesDown) == Catch::Approx(-2.857142857).margin(0.0001));
 }
+
+TEST_CASE("maxDrawdown reports the worst drawdown seen, not just the current one", "[metrics]") {
+    Account acct(10000.0);
+    std::unordered_map<long int, Trade> history;
+    Metrics calc(acct, history, {});
+
+    calc.drawDown(10000.0); // establishes the first peak
+    calc.drawDown(12000.0); // new peak, drawdown still 0
+    calc.drawDown(10800.0); // 10% below the 12000 peak
+    REQUIRE(calc.maxDrawdown() == Catch::Approx(-10.0));
+
+    calc.drawDown(11000.0); // partial recovery -- doesn't erase the worse -10% already seen
+    REQUIRE(calc.maxDrawdown() == Catch::Approx(-10.0));
+
+    calc.drawDown(13000.0); // a new peak again
+    REQUIRE(calc.maxDrawdown() == Catch::Approx(-10.0)); // still the worst ever seen
+}
+
+TEST_CASE("returnsFromEquityCurve converts equity levels into period returns", "[metrics]") {
+    // 10500/10000-1 = 0.05 exactly; 9975/10500-1 = -0.05 exactly
+    std::vector<double> returns = Metrics::returnsFromEquityCurve({10000.0, 10500.0, 9975.0});
+
+    REQUIRE(returns.size() == 2);
+    REQUIRE(returns[0] == Catch::Approx(0.05));
+    REQUIRE(returns[1] == Catch::Approx(-0.05));
+}
+
+TEST_CASE("returnsFromEquityCurve returns empty for fewer than two points", "[metrics]") {
+    REQUIRE(Metrics::returnsFromEquityCurve({}).empty());
+    REQUIRE(Metrics::returnsFromEquityCurve({10000.0}).empty());
+}
+
+TEST_CASE("sharpeRatio computes an annualized risk-adjusted return", "[metrics]") {
+    Account acct(10000.0);
+    std::unordered_map<long int, Trade> history;
+    Metrics calc(acct, history, {});
+
+    std::vector<double> returns{0.02, 0.04, 0.06};
+    // mean=0.04, sample stddev=0.02 -> (0.04/0.02)*sqrt(1) = 2.0
+    REQUIRE(calc.sharpeRatio(returns, 0.0, 1.0) == Catch::Approx(2.0));
+    // same returns annualized over 4 periods/year -> 2.0*sqrt(4) = 4.0
+    REQUIRE(calc.sharpeRatio(returns, 0.0, 4.0) == Catch::Approx(4.0));
+}
+
+TEST_CASE("sharpeRatio is clamped to zero when returns have no variance", "[metrics]") {
+    Account acct(10000.0);
+    std::unordered_map<long int, Trade> history;
+    Metrics calc(acct, history, {});
+
+    std::vector<double> flatReturns{0.05, 0.05, 0.05};
+    REQUIRE(calc.sharpeRatio(flatReturns, 0.0, 1.0) == Catch::Approx(0.0));
+}
+
+TEST_CASE("sortinoRatio computes an annualized downside-risk-adjusted return", "[metrics]") {
+    Account acct(10000.0);
+    std::unordered_map<long int, Trade> history;
+    Metrics calc(acct, history, {});
+
+    std::vector<double> returns{0.05, -0.02, 0.03, -0.01};
+    // mean=0.0125, downside deviation=sqrt(1.25)/... closed form works out to sqrt(1.25)
+    REQUIRE(calc.sortinoRatio(returns, 0.0, 1.0) == Catch::Approx(1.118033988749895));
+}
+
+TEST_CASE("sortinoRatio is clamped to zero when there are no losing periods", "[metrics]") {
+    Account acct(10000.0);
+    std::unordered_map<long int, Trade> history;
+    Metrics calc(acct, history, {});
+
+    std::vector<double> allPositive{0.02, 0.04, 0.06};
+    REQUIRE(calc.sortinoRatio(allPositive, 0.0, 1.0) == Catch::Approx(0.0));
+}
+
+TEST_CASE("benchmarkReturn computes a naive buy-and-hold percentage return", "[metrics]") {
+    Account acct(10000.0);
+    std::unordered_map<long int, Trade> history;
+    Metrics calc(acct, history, {});
+
+    REQUIRE(calc.benchmarkReturn(100.0, 120.0) == Catch::Approx(20.0));
+}

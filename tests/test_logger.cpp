@@ -135,10 +135,32 @@ TEST_CASE("exportJSON writes correctly-computed metrics and trade counts", "[log
     double cagrLength = 1.0;
     std::string simID = "testSim";
 
+    // Log a small equity curve so Sharpe/Sortino/MaxDrawdown/BenchmarkReturn
+    // (which read fullHistory, not the scalar args above) have real data to
+    // work with: equity rises 10000->10608 then dips to 10200.
+    Bar barA; barA.ticker = "AAPL"; barA.date = "2024-01-01"; barA.open = 100.0; barA.high = 100.0; barA.low = 100.0; barA.close = 100.0; barA.volume = 1000;
+    Bar barB; barB.ticker = "AAPL"; barB.date = "2024-01-02"; barB.open = 106.0; barB.high = 106.0; barB.low = 106.0; barB.close = 106.08; barB.volume = 1000;
+    Bar barC; barC.ticker = "AAPL"; barC.date = "2024-01-03"; barC.open = 105.0; barC.high = 105.0; barC.low = 105.0; barC.close = 105.0; barC.volume = 1000;
+
+    logger.logSnapshot("2024-01-01", {{"AAPL", barA}}, 10000.0, 10000.0, {}, calc.drawDown(10000.0));
+    logger.logSnapshot("2024-01-02", {{"AAPL", barB}}, 10608.0, 10608.0, {}, calc.drawDown(10608.0));
+    logger.logSnapshot("2024-01-03", {{"AAPL", barC}}, 10200.0, 10200.0, {}, calc.drawDown(10200.0));
+
+    // Independently compute the expected values from the exact same inputs
+    // exportJSON will use internally -- this checks the *wiring* (does
+    // exportJSON correctly read fullHistory and pass it through Metrics),
+    // since the formulas themselves are already verified against hand-picked
+    // numbers in test_performance.cpp.
+    std::vector<double> expectedReturns = Metrics::returnsFromEquityCurve({10000.0, 10608.0, 10200.0});
+    double expectedSharpe = calc.sharpeRatio(expectedReturns, 0.0, 1.0);
+    double expectedSortino = calc.sortinoRatio(expectedReturns, 0.0, 1.0);
+    double expectedMaxDrawdown = calc.maxDrawdown();
+    double expectedBenchmark = calc.benchmarkReturn(100.0, 105.0);
+
     fs::path outPath = fs::temp_directory_path() / "backtest_engine_test_metricData.json";
     TempPathGuard guard{outPath};
 
-    logger.exportJSON(outPath, "metricData.json", calc, simID, prices, initBalance, cagrLength, history);
+    logger.exportJSON(outPath, "metricData.json", calc, simID, prices, initBalance, cagrLength, history, 1.0);
 
     std::ifstream file(outPath);
     REQUIRE(file.is_open());
@@ -148,6 +170,10 @@ TEST_CASE("exportJSON writes correctly-computed metrics and trade counts", "[log
     REQUIRE(parsed["simID"] == "testSim");
     REQUIRE(parsed["totalReturns"].get<double>() == Catch::Approx(5.0));
     REQUIRE(parsed["CAGR"].get<double>() == Catch::Approx(5.0));
+    REQUIRE(parsed["MaxDrawdown"].get<double>() == Catch::Approx(expectedMaxDrawdown));
+    REQUIRE(parsed["SharpeRatio"].get<double>() == Catch::Approx(expectedSharpe));
+    REQUIRE(parsed["SortinoRatio"].get<double>() == Catch::Approx(expectedSortino));
+    REQUIRE(parsed["BenchmarkReturn"].get<double>() == Catch::Approx(expectedBenchmark));
     REQUIRE(parsed["Trade_records"]["Number_of_trades"] == 3);
     REQUIRE(parsed["Trade_records"]["Successful_trades"] == 2);
     REQUIRE(parsed["Trade_records"]["Unsuccessful_trades"] == 1);

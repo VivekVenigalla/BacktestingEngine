@@ -71,7 +71,7 @@ void Logger::exportCSV(fs::path filepath, std::string filename){
     }
 }
 
-void Logger::exportJSON(fs::path filepath, std::string filename, Metrics& calculator, std::string& simID, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::unordered_map<long int, Trade>& historyRef){
+void Logger::exportJSON(fs::path filepath, std::string filename, Metrics& calculator, std::string& simID, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::unordered_map<long int, Trade>& historyRef, double periodsPerYear){
     //obtain all metrics
     double totalReturns = calculator.totalReturn(initBalance, currPrices);
     double cagr = calculator.cagr(initBalance, currPrices, cagrLength);
@@ -84,6 +84,21 @@ void Logger::exportJSON(fs::path filepath, std::string filename, Metrics& calcul
         }
     }
     int unsucTrade = tradeNum - successfulTrade;
+
+    //additional performance stats computed from the bar-by-bar history already
+    //recorded via logSnapshot -- no extra data plumbing needed
+    double maxDD = calculator.maxDrawdown();
+    std::vector<double> returns = Metrics::returnsFromEquityCurve(fullHistory.totalEquity);
+    double sharpe = calculator.sharpeRatio(returns, 0.0, periodsPerYear);
+    double sortino = calculator.sortinoRatio(returns, 0.0, periodsPerYear);
+
+    double benchmark = 0.0;
+    if(!fullHistory.bars.empty() && !fullHistory.bars.front().empty()){
+        std::string primaryTicker = fullHistory.bars.front().begin()->first;
+        double startPrice = fullHistory.bars.front().at(primaryTicker).close;
+        double endPrice = fullHistory.bars.back().at(primaryTicker).close;
+        benchmark = calculator.benchmarkReturn(startPrice, endPrice);
+    }
 
 
     //open file
@@ -98,6 +113,10 @@ void Logger::exportJSON(fs::path filepath, std::string filename, Metrics& calcul
         metric["simID"] = simID;
         metric["totalReturns"] = totalReturns;
         metric["CAGR"] = cagr;
+        metric["MaxDrawdown"] = maxDD;
+        metric["SharpeRatio"] = sharpe;
+        metric["SortinoRatio"] = sortino;
+        metric["BenchmarkReturn"] = benchmark;
         metric["Trade_records"]["Number_of_trades"] = tradeNum;
         metric["Trade_records"]["Successful_trades"] = successfulTrade;
         metric["Trade_records"]["Unsuccessful_trades"] = unsucTrade;
@@ -157,7 +176,7 @@ void Logger::exportCSVTrade(fs::path filepath, std::string filename, std::unorde
     }
 }
 
-void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::string batchID){
+void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::string batchID, double periodsPerYear){
 
     //path to the output folder
     fs::path baseDir = fs::path(PROJECT_SOURCE_DIR) / "output";
@@ -196,7 +215,7 @@ void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_
     std::string jsonFile = "metricData.json";
 
     fs::path jsonPath = targetFolder / jsonFile;
-    exportJSON(jsonPath, jsonFile, calculator, simID, currPrices, initBalance, cagrLength, historyRef);
+    exportJSON(jsonPath, jsonFile, calculator, simID, currPrices, initBalance, cagrLength, historyRef, periodsPerYear);
 
     std::cout << "All files successfully created in directory: " << targetFolder.string() << "\n";
 

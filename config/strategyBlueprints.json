@@ -7,7 +7,8 @@
             "feedNum":1,
             "parameters": [
               {"name": "fast_period", "type": "int", "default": 10},
-              {"name": "slow_period", "type": "int", "default": 50}
+              {"name": "slow_period", "type": "int", "default": 50},
+              {"name": "position_size_pct", "type": "float", "default": 0.2}
             ]
         },
         {
@@ -16,7 +17,8 @@
             "description": "Breakout strategy using stop orders on extreme values.",
             "feedNum":1,
             "parameters": [
-              {"name": "window", "type": "int", "default": 20}
+              {"name": "window", "type": "int", "default": 20},
+              {"name": "position_size_pct", "type": "float", "default": 0.2}
             ]
         },
         {
@@ -25,7 +27,8 @@
             "description": "Trend following strategy utilizing standard deviations and crossings.",
             "feedNum":1,
             "parameters": [
-              {"name": "window", "type": "int", "default": 20}
+              {"name": "window", "type": "int", "default": 20},
+              {"name": "position_size_pct", "type": "float", "default": 0.2}
             ]
         }
     ]

@@ -7,6 +7,9 @@ bollBand::bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& 
 }
 bollBand::bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window) : Strategy(b, u, cBs, history, symbol), windowSize(window){
 }
+bollBand::bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window, double posSizePct) : bollBand(b, u, cBs, history, symbol, window){
+    positionSizePct = posSizePct;
+}
 
 void bollBand::init(){
     std::cout << "Created a Bollinger Band(Mean Reversion) Strategy" << std::endl;
@@ -42,7 +45,7 @@ void bollBand::runBar(){
 
         if(currPrice < upperBound && state == 1){
             if(currPrice > windowAverage){
-                long numShares = std::floor(user.positionQuantity(ticker)*0.2);
+                long numShares = sizeSellOrder(user.positionQuantity(ticker));
                 nextOrder = {ticker, "market", 1, numShares, -1.0};
                 broker.createOrder(nextOrder);
             }
@@ -50,9 +53,8 @@ void bollBand::runBar(){
         }
         else if(currPrice > lowerBound && state == -1){
             if(currPrice < windowAverage){
-                double currBalance = user.checkBalance();
-                //calculate 20% of currBalance worth in shares(floored in order to have int shares)
-                long numShares = std::floor((currBalance*0.2)/currPrice);
+                //size the buy using the shared, configurable position-sizing helper
+                long numShares = sizeBuyOrder(currPrice);
                 //create Order struct
                 nextOrder = {ticker, "market", 0, numShares, -1.0};
                 broker.createOrder(nextOrder);

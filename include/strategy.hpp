@@ -29,5 +29,10 @@ class Strategy{
         std::unordered_map<std::string, Bar>& connectBars;
         std::string ticker;
 
+        //fraction of balance/quantity used per sizing call; 0.2 (20%) matches
+        //what every concrete strategy hardcoded before this was extracted
+        double positionSizePct = 0.2;
+        long sizeBuyOrder(double price) const;
+        long sizeSellOrder(long currentQuantity) const;
 
 };

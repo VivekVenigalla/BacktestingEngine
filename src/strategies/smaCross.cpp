@@ -15,6 +15,10 @@ smaCross::smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& 
     }
 }
 
+smaCross::smaCross(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int fast, int slow, double posSizePct) : smaCross(b, u, cBs, history, symbol, fast, slow){
+    positionSizePct = posSizePct;
+}
+
 void smaCross::init(){
     std::cout << "Created a SMA Strategy" << std::endl;
 }
@@ -49,9 +53,8 @@ void smaCross::runBar(){
 
         //check if fast is larger than slow => golden cross
         if(fastAverage > slowAverage){
-            double currBalance = user.checkBalance();
-            //calculate 20% of currBalance worth in shares(floored in order to have int shares)
-            long numShares = std::floor((currBalance*0.2)/currPrice);
+            //size the buy using the shared, configurable position-sizing helper
+            long numShares = sizeBuyOrder(currPrice);
             //create Order struct
             nextOrder = {ticker, "market", 0, numShares, -1.0};
             broker.createOrder(nextOrder);

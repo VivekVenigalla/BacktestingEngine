@@ -7,6 +7,9 @@ donChannel::donChannel(Broker& b, Account& u, std::unordered_map<std::string, Ba
 }
 donChannel::donChannel(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window) : Strategy(b, u, cBs, history, symbol), windowSize(window){
 }
+donChannel::donChannel(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window, double posSizePct) : donChannel(b, u, cBs, history, symbol, window){
+    positionSizePct = posSizePct;
+}
 
 void donChannel::init(){
     std::cout << "Created a Donchian Channel(Breakout) Strategy" << std::endl;
@@ -28,13 +31,12 @@ void donChannel::runBar(){
             broker.deleteOrder(lowestID, "STRATEGY CREATING NEW ORDER");
         }
         
-        double currBalance = user.checkBalance();
-        //calculate 20% of currBalance worth in shares(floored in order to have int shares)
-        long numShares = std::floor((currBalance*0.2)/currPrice);
+        //size both stop orders using the shared, configurable position-sizing helper
+        long numShares = sizeBuyOrder(currPrice);
         //create Order struct
         highestOrder = Order{ticker, "stop", 0, numShares, (*highest+0.01)};
-        
-        numShares = std::floor(user.positionQuantity(ticker)*0.2);
+
+        numShares = sizeSellOrder(user.positionQuantity(ticker));
         lowestOrder = Order{ticker, "stop", 1, numShares, (*lowest-0.01)};
 
         highestID = broker.createOrder(highestOrder);

@@ -17,6 +17,7 @@ class bollBand : public Strategy{
     public:
         bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol);
         bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window);
+        bollBand(Broker& b, Account& u, std::unordered_map<std::string, Bar>& cBs, std::unordered_map<long int, Trade>& history, std::string symbol, int window, double posSizePct);
         void runBar();
         void init();
         virtual ~bollBand() = default;
@@ -30,7 +31,7 @@ class bollBand : public Strategy{
         //if the state is 1, price is above upper bound
         //if the state is -1, price is below lower bound
         int state = 0;
-        double windowSum;
+        double windowSum = 0.0;
         Order nextOrder;
         //check is not currently used right now since the Broker::checkLoop() is executed on the next day now
         bool check = false;

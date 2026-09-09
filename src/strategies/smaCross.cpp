@@ -25,7 +25,15 @@ void smaCross::init(){
 
 void smaCross::runBar(){
 
-    
+    //if a bracket is waiting on a buy that has since filled, place it now
+    //(entry price comes from the account's own AEP, since that's the real
+    //fill price rather than a remembered/guessed one)
+    if(bracketPending && user.positionQuantity(ticker) >= bracketQuantity){
+        placeBracketOrders(user.positionAEP(ticker), bracketQuantity, stopLossPct, takeProfitPct);
+        bracketPending = false;
+        bracketQuantity = 0;
+    }
+
     //add value to both sums and chekc if queues are filled(connectBar will have the most recent Bar)
     double currPrice = connectBars.begin()->second.close;
     std::cout<<currPrice << std::endl;
@@ -58,6 +66,10 @@ void smaCross::runBar(){
             //create Order struct
             nextOrder = {ticker, "market", 0, numShares, -1.0};
             broker.createOrder(nextOrder);
+            //the buy is only queued, not filled yet -- place the protective
+            //bracket once it actually fills (see bracketPending's comment)
+            bracketPending = true;
+            bracketQuantity = numShares;
         }
         else if(fastAverage < slowAverage){
             long numShares = user.positionQuantity(ticker);

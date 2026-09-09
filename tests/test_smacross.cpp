@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <algorithm>
 #include "strategies/smaCross.hpp"
 
 // smaCross::fastSum/slowSum accumulate rolling sums for the fast/slow moving
@@ -70,4 +71,63 @@ TEST_CASE("smaCross places a sell order on a death cross (fast average below slo
     const Order& placed = broker.returnOrders().begin()->second;
     REQUIRE(placed.side == 1); // sell
     REQUIRE(placed.quantity == 50); // sells the entire held position
+}
+
+TEST_CASE("smaCross places a protective bracket once its buy order actually fills", "[smacross]") {
+    Account acct(10000.0);
+    std::unordered_map<std::string, Bar> bars;
+    std::unordered_map<long int, Trade> history;
+    Broker broker(acct, bars, /*commission*/0.0, /*slippage*/0.0, "b");
+
+    smaCross strat(broker, acct, bars, history, "AAPL", /*fast*/2, /*slow*/4);
+
+    // checkLoop() is called before runBar() each bar here, mirroring
+    // SimulationRunner::step()'s real ordering -- a market buy is only
+    // queued by createOrder(), so it fills on the NEXT bar's checkLoop(),
+    // not the bar it was requested on.
+    auto feedBar = [&](double open, double close) {
+        Bar bar;
+        bar.ticker = "AAPL";
+        bar.date = "2024-01-01";
+        bar.open = open;
+        bar.high = std::max(open, close);
+        bar.low = std::min(open, close);
+        bar.close = close;
+        bar.volume = 1000;
+        bars["AAPL"] = bar;
+        broker.checkLoop();
+        strat.runBar();
+    };
+
+    // Same golden-cross series as the test above: fires on the 4th bar.
+    feedBar(100.0, 100.0);
+    feedBar(100.0, 100.0);
+    feedBar(100.0, 100.0);
+    feedBar(140.0, 140.0); // golden cross -> buy queued, not yet filled
+
+    REQUIRE(broker.returnOrders().size() == 1); // just the pending buy
+
+    // 5th bar: checkLoop() (called first, inside feedBar) fills the queued
+    // buy at this bar's open (140.0); runBar() then sees the position exists
+    // and places the bracket. Close is chosen (60.0) so the fast/slow
+    // averages land exactly equal afterward -- otherwise a strategy this
+    // simple would immediately re-enter (or exit) on the same bar and add a
+    // 3rd, unrelated order, muddying this test's specific assertion.
+    feedBar(140.0, 60.0);
+
+    REQUIRE(broker.returnOrders().size() == 2); // stop-sell + limit-sell
+    bool foundStop = false, foundLimit = false;
+    for (const auto& [id, order] : broker.returnOrders()) {
+        REQUIRE(order.side == 1);
+        REQUIRE(order.quantity == 14);
+        if (order.type == "stop") {
+            foundStop = true;
+            REQUIRE(order.checkPrice == Catch::Approx(140.0 * 0.95)); // AEP=140.0 (the fill price), 5% below
+        } else if (order.type == "limit") {
+            foundLimit = true;
+            REQUIRE(order.checkPrice == Catch::Approx(140.0 * 1.10)); // 10% above
+        }
+    }
+    REQUIRE(foundStop);
+    REQUIRE(foundLimit);
 }

@@ -17,3 +17,10 @@ long Strategy::sizeBuyOrder(double price) const{
 long Strategy::sizeSellOrder(long currentQuantity) const{
     return static_cast<long>(std::floor(currentQuantity * positionSizePct));
 }
+
+void Strategy::placeBracketOrders(double entryPrice, long quantity, double stopLossPct, double takeProfitPct){
+    Order stopOrder{ticker, "stop", 1, quantity, entryPrice * (1.0 - stopLossPct)};
+    Order limitOrder{ticker, "limit", 1, quantity, entryPrice * (1.0 + takeProfitPct)};
+    broker.createOrder(stopOrder);
+    broker.createOrder(limitOrder);
+}

@@ -28,6 +28,20 @@ class smaCross : public Strategy{
         double fastSum = 0.0;
         double slowSum = 0.0;
         Order nextOrder;
+
+        //stretch item: hardcoded (not config-threaded) protective bracket
+        //percentages placed after a golden-cross buy -- see
+        //Strategy::placeBracketOrders for the known non-OCO limitation
+        double stopLossPct = 0.05;
+        double takeProfitPct = 0.10;
+
+        //a market buy is only queued by createOrder(), not filled until the
+        //NEXT step's checkLoop() runs before runBar() -- placing the bracket
+        //immediately would be rejected for insufficient shares (the position
+        //doesn't exist yet). These track "place the bracket as soon as the
+        //shares actually show up", checked at the top of the next runBar().
+        bool bracketPending = false;
+        long bracketQuantity = 0;
         bool check = false;
         //implementing a queue allows for easy plug in and extraction so we dont have to iterate a lot.
         std::queue<double> fastWindow;

@@ -35,4 +35,14 @@ class Strategy{
         long sizeBuyOrder(double price) const;
         long sizeSellOrder(long currentQuantity) const;
 
+        //Places a protective stop-sell (entryPrice*(1-stopLossPct)) and a
+        //protective limit-sell (entryPrice*(1+takeProfitPct)) after opening a
+        //long position. NOT a true OCO (one-cancels-other) bracket: if one
+        //fills, the other is left pending in the broker's order map and
+        //simply fails checkOrder's validation (insufficient shares) on a
+        //later bar rather than being cancelled -- it degrades gracefully
+        //rather than crashing, but isn't cleaned up either. True OCO would
+        //need order-linking at the Broker level, which is out of scope here.
+        void placeBracketOrders(double entryPrice, long quantity, double stopLossPct, double takeProfitPct);
+
 };

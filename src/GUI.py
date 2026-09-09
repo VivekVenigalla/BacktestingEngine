@@ -528,26 +528,51 @@ def delete_feed(feed_id):
 # =============================================================
 
 #nodes work with nodes being the different sections and the attributes being the connections betwee nodes
+#dearpygui's node_editor is a whole separate widget system on top of the
+#regular ui: a "node"(dpg.node) is one draggable box on the canvas, and
+#each node contains one or more "node_attribute"s, which are the actual pin
+#connection points on its edges. an attribute_type of Input/Output decides
+#which side of the box the pin renders on and which direction a wire can
+#run(Static is used for attributes that are just informational text, with
+#no pin at all - see the balance/reset display below). every node/
+#attribute here also gets a "user_data" dict attached to it - that's not a
+#dearpygui built-in concept, it's this project's own convention for
+#stashing "what kind of thing is this, and what's its underlying account/
+#broker/feed/strategy data" directly on the visual widget, so later code
+#(on_node_link_created, parse_workbench_canvas...) can read it back off
+#whatever node/pin the user clicked or connected
 
 def spawn_account_node(account_data, pos = [50,50]):
     #generate a unique id for both the tag and the attribute
     node_tag = dpg.generate_uuid()
     out_attr_tag = dpg.generate_uuid()
-    
+
+    #parent="node_editor_canvas" is what places this new node onto the
+    #actual node-editor widget(defined once, further down, in VIEWPORT 3) -
+    #dearpygui lets you attach a new item to an existing parent by tag even
+    #from a totally different function, not just via nesting "with" blocks
     with dpg.node(parent="node_editor_canvas", label=f"Account: {account_data['id']}", tag=node_tag, pos=pos):
         # Store metadata inside user_data
         dpg.set_item_user_data(node_tag, {"type": "ACCOUNT", "data": account_data})
-        
+
+        #a Static attribute has no connectable pin - it's just used here to
+        #show a couple of read-only text lines inside the node's body
         with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
             dpg.add_text(f"Initial Balance: ${account_data['initial_balance']}")
             dpg.add_text(f"Reset on Run: {account_data['reset']}")
-            
+
         #output pin for strategy and broker
+        #this pin's own user_data({"pin_type": "ACCOUNT"}) is separate from
+        #the node's user_data set above - it's what on_node_link_created
+        #checks to enforce "an ACCOUNT output can only connect to an
+        #ACCOUNT-shaped input", further down this file
         with dpg.node_attribute(tag=out_attr_tag, attribute_type=dpg.mvNode_Attr_Output, user_data={"pin_type": "ACCOUNT"}):
             dpg.add_text("Account Link ->", color=[100, 200, 255])
     return node_tag
 
 
+#same node/attribute/user_data pattern as spawn_account_node above, just
+#with one INPUT pin(account) as well as one output pin this time
 def spawn_broker_node(broker_data, pos = [300,50]):
     node_tag = dpg.generate_uuid()
     #broker requires one in attrribute 
@@ -571,6 +596,7 @@ def spawn_broker_node(broker_data, pos = [300,50]):
     return node_tag
 
 
+#same pattern once more, output-only(a feed only ever feeds INTO a strategy)
 def spawn_feed_node(feed_data, pos = [50,300]):
     node_tag = dpg.generate_uuid()
     out_feed_tag = dpg.generate_uuid()
@@ -587,55 +613,74 @@ def spawn_feed_node(feed_data, pos = [50,300]):
             dpg.add_text("Feed Link ->", color=[100, 255, 100])
     return node_tag
 
+#the strategy node is the busiest one - three input pins(account, broker,
+#feed) PLUS a block of parameter widgets that are built dynamically based
+#on whatever "parameters" list came from strategyBlueprints.json for this
+#strategy(see the createStrat.cpp/strategyBlueprints.json side of this same
+#contract - {"name","type","default"} objects), rather than being hardcoded
+#per strategy type here
 def spawn_strategy_node(strategy_data, pos = [600,150]):
     node_tag = dpg.generate_uuid()
     in_acct_tag = dpg.generate_uuid()
     in_broker_tag = dpg.generate_uuid()
     in_feed_tag = dpg.generate_uuid()
-    
+
     with dpg.node(parent="node_editor_canvas", label=f"Strategy: {strategy_data['display_name']}", tag=node_tag, pos=pos):
         dpg.set_item_user_data(node_tag, {"type": "STRATEGY", "data": strategy_data})
-        
+
         #input pins for account, broker, and feed
         with dpg.node_attribute(tag=in_acct_tag, attribute_type=dpg.mvNode_Attr_Input,user_data={"pin_type": "ACCOUNT"}):
             dpg.add_text("<- Account Link", color=[100, 200, 255])
-            
+
         with dpg.node_attribute(tag=in_broker_tag, attribute_type=dpg.mvNode_Attr_Input,user_data={"pin_type": "BROKER"}):
             dpg.add_text("<- Broker Link", color=[255, 200, 100])
-            
+
         with dpg.node_attribute(tag=in_feed_tag, attribute_type=dpg.mvNode_Attr_Input,user_data={"pin_type": "FEED"}):
             dpg.add_text("<- Feed Link(s)", color=[100, 255, 100])
-            
+
         #inputs for parameters
         with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+            #node_tag is a plain integer(from generate_uuid), so "% 1000"
+            #(modulo - the remainder after dividing by 1000) just chops it
+            #down to a short 3-digit-ish number for a friendlier-looking
+            #default sim id, rather than the full, much longer raw uuid
             default_sim_id = f"{strategy_data['id']}_instance_{node_tag % 1000}"
             dpg.add_input_text(
-                label="Sim ID", 
-                default_value=default_sim_id, 
-                width=130, 
+                label="Sim ID",
+                default_value=default_sim_id,
+                width=130,
                 tag=f"sim_id_{node_tag}"
             )
-            
+
             # 2. Run by Default Checkbox
             dpg.add_checkbox(
-                label="Run Default", 
-                default_value=True, 
+                label="Run Default",
+                default_value=True,
                 tag=f"run_default_{node_tag}"
             )
-            
-            
+
+
 
             #dpg.add_separator()
             dpg.add_text("Parameters(Overridable):", color=[200, 200, 200])
-            
+
             # Dynamically draw parameter controls based on type
+            #this loop is what makes the node's parameter section adapt to
+            #whatever strategy it represents - each parameter's json
+            #"type" field picks which kind of input widget to draw
+            #(int/float/bool/anything else falls back to plain text), and
+            #each widget's tag encodes both this node's id and the
+            #parameter's name(f"param_{node_tag}_{p_name}") so
+            #parse_workbench_canvas can later find and read back every
+            #parameter for every strategy node on the canvas, just by
+            #reconstructing that same tag pattern
             for param in strategy_data.get("parameters", []):
                 p_name = param["name"]
                 p_type = param.get("type", "float")
                 p_default = param.get("default", 0)
-                
+
                 param_tag = f"param_{node_tag}_{p_name}"
-                
+
                 if p_type == "int":
                     dpg.add_input_int(label=p_name, default_value=int(p_default), width=120, tag=param_tag)
                 elif p_type == "float":
@@ -653,6 +698,10 @@ def clear_workbench_canvas():
         dpg.delete_item("node_editor_canvas", children_only=True)
 
 
+#this is the reverse of parse_workbench_canvas further down(which turns
+#nodes+links INTO a batch json) - this function takes an existing batch
+#json and rebuilds the equivalent nodes+links back onto the canvas, so a
+#previously-saved batch can be reopened and edited visually
 def load_batch_file_to_workbench(file_path):
     #parse an existing batch and switch to workbench view, while also creating the nodes and connections
     if not os.path.exists(file_path):
@@ -710,6 +759,10 @@ def load_batch_file_to_workbench(file_path):
         spawned_feeds[feed_data["id"]] = node_tag
         y_feed += 180
 
+    #"{st["id"]: st for st in ...}" is a dict comprehension - the dict
+    #version of the list comprehensions used in core.py, building a
+    #{strategy_id: full_strategy_dict} lookup table in one line instead of
+    #a manual for-loop with dict[key] = value assignments
     registered_strats = {
         st["id"]: st for st in core.state.get("registered_strategies", {}).get("strategies", [])
     }
@@ -749,20 +802,30 @@ def load_batch_file_to_workbench(file_path):
                 link_nodes_by_pin_type(spawned_feeds[feed_id], strat_node_tag, "FEED")
 
 def find_node_attribute(node_tag, pin_type, is_output=False):
-    
+
     #find the attribute id for the the matching pin type an direction
     if not dpg.does_item_exist(node_tag):
         return None
 
     #get one slot children
+    #dpg.get_item_children(node_tag, 1) returns just the items in "slot 1"
+    #of this node - dearpygui items can have several separate child slots
+    #for different purposes, and slot 1 is specifically where a node's own
+    #node_attribute children live. "or []" falls back to an empty list if
+    #this call ever returns None, so the for loop below never crashes on a
+    #node with no children at all
     children = dpg.get_item_children(node_tag, 1) or []
     target_attr_type = dpg.mvNode_Attr_Output if is_output else dpg.mvNode_Attr_Input
 
     for child_id in children:
+        #dpg.get_item_type gives back a string identifying what KIND of
+        #widget an item is - this filters down to just the node_attribute
+        #children(skipping over the dpg.add_text items etc that live
+        #inside them)
         if dpg.get_item_type(child_id) == "mvAppItemType::mvNodeAttribute":
             conf = dpg.get_item_configuration(child_id)
             attr_direction = conf.get("attribute_type")
-            
+
             u_data = dpg.get_item_user_data(child_id) or {}
             attr_pin_type = u_data.get("pin_type")
 
@@ -773,8 +836,12 @@ def find_node_attribute(node_tag, pin_type, is_output=False):
 
 
 def link_nodes_by_pin_type(src_node, dst_node, pin_type):
+    #a triple-quoted string placed as the very first thing inside a
+    #function is a real docstring(not just a comment) - tools/editors can
+    #show it as this function's official documentation, unlike a regular
+    #comment which they generally can't
     """
-    Finds the output pin on src_node and input pin on dst_node 
+    Finds the output pin on src_node and input pin on dst_node
     for the specified pin_type and creates a visual link wire.
     """
     src_attr = find_node_attribute(src_node, pin_type, is_output=True)
@@ -810,12 +877,22 @@ def get_all_active_links():
     return links
 
 
+#this is the callback wired up to the node_editor's own "callback"(see
+#VIEWPORT 3's dpg.node_editor(...) call) - dearpygui runs it automatically
+#every time the user drags a wire between two pins, BEFORE the wire is
+#actually drawn. all of the validation below decides whether
+#dpg.add_node_link actually gets called at the very end(and therefore
+#whether the wire appears at all) - if any check fails and returns early,
+#the connection is silently rejected
 def on_node_link_created(sender, app_data):
-    
+
     #when two nodes are connected, this is executed
     #app data is the start and end node
+    #app_data arrives as a 2-item tuple(the two pins involved); "attr_start,
+    #attr_end = app_data" is tuple unpacking - assigning each element of a
+    #tuple/list to its own named variable in one line
     attr_start, attr_end = app_data
-    
+
     node_start, data_start = get_pin_info(attr_start)
     node_end, data_end = get_pin_info(attr_end)
     
@@ -831,6 +908,11 @@ def on_node_link_created(sender, app_data):
     type_end = data_end.get("type")
     
     #valid connection rules (first -> second)
+    #a tuple like ("ACCOUNT", "BROKER") can be compared for equality and
+    #used with "in"/"not in" just like any other value - bundling
+    #type_start/type_end into a tuple() below and checking it against this
+    #whole list of valid (from, to) pairs in one line is shorter than
+    #writing out every combination as a separate if/or condition
     valid_connections = [
         ("ACCOUNT", "BROKER"),
         ("ACCOUNT", "STRATEGY"),
@@ -924,6 +1006,15 @@ def on_node_link_deleted(sender, app_data):
     print(f"[UI Link Deleted] Link ID: {app_data}")
 
 
+#this is the single most important function in the whole gui - it's the
+#reverse of load_batch_file_to_workbench: walks every node and wire
+#currently on the canvas and compiles them into the exact batch json
+#structure the c++ engine expects(matching the shape you'd see in
+#config/batchConfig/*.json). it returns a python tuple(batch_config,
+#error_message) - by convention here, exactly one of the two is ever
+#non-None: a success hands back (dict, None), a validation failure hands
+#back (None, "some message"), so callers always check "if error_msg:"
+#first before trusting batch_config
 def parse_workbench_canvas():
     #return type : batch_config and error message if any
 
@@ -932,6 +1023,11 @@ def parse_workbench_canvas():
     if not dpg.does_item_exist("node_editor_canvas"):
         return None, "Node canvas does not exist."
 
+    #dpg.get_all_items() returns literally every widget in the whole
+    #program, not just this canvas - these two list comprehensions filter
+    #that flat list down to just the mvNode/mvNodeLink items(the actual
+    #boxes and wires), same "get_item_type == ..." filtering idea used in
+    #find_node_attribute above
     all_items = dpg.get_all_items()
     nodes = [item for item in all_items if dpg.get_item_type(item) == "mvAppItemType::mvNode"]
     links = [item for item in all_items if dpg.get_item_type(item) == "mvAppItemType::mvNodeLink"]

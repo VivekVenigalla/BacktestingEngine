@@ -123,10 +123,14 @@ TEST_CASE("exportJSON writes correctly-computed metrics and trade counts", "[log
     Account acct(10000.0);
     acct.modifyBalance(500.0); // equity now 10500 -> 5% total return / CAGR over 1 year
 
+    // filled1 is a winning sell, filled2 a losing sell, unfilled excluded from
+    // win-rate/profit-factor entirely (side/realizedPnL set explicitly on all
+    // three -- winRate()/profitFactor() read `side`, so leaving it
+    // default/uninitialized here would be reading garbage memory).
     Trade filled1, filled2, unfilled;
-    filled1.filled = true;
-    filled2.filled = true;
-    unfilled.filled = false;
+    filled1.filled = true; filled1.side = 1; filled1.realizedPnL = 100.0;
+    filled2.filled = true; filled2.side = 1; filled2.realizedPnL = -50.0;
+    unfilled.filled = false; unfilled.side = 1; unfilled.realizedPnL = 0.0;
     std::unordered_map<long int, Trade> history{{1, filled1}, {2, filled2}, {3, unfilled}};
 
     Metrics calc(acct, history, {});
@@ -177,6 +181,10 @@ TEST_CASE("exportJSON writes correctly-computed metrics and trade counts", "[log
     REQUIRE(parsed["Trade_records"]["Number_of_trades"] == 3);
     REQUIRE(parsed["Trade_records"]["Successful_trades"] == 2);
     REQUIRE(parsed["Trade_records"]["Unsuccessful_trades"] == 1);
+    // 1 win (filled1, +100) of 2 closed trades (filled1, filled2) -> 50%
+    REQUIRE(parsed["Trade_records"]["Win_rate"].get<double>() == Catch::Approx(50.0));
+    // grossProfit=100, grossLoss=50 -> 2.0
+    REQUIRE(parsed["Trade_records"]["Profit_factor"].get<double>() == Catch::Approx(2.0));
 }
 
 TEST_CASE("exportData creates a fresh simulation folder with all three output files", "[logger]") {

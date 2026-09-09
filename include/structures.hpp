@@ -90,6 +90,9 @@ struct Trade{
     bool filled;
     std::string status;
     double currBalance;
+    //realized profit/loss for a filled sell, relative to the pre-sale average
+    //entry price; 0.0 for buys and unfilled trades, where it isn't meaningful
+    double realizedPnL = 0.0;
 
     void print() const;
 };

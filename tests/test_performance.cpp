@@ -153,3 +153,46 @@ TEST_CASE("benchmarkReturn computes a naive buy-and-hold percentage return", "[m
 
     REQUIRE(calc.benchmarkReturn(100.0, 120.0) == Catch::Approx(20.0));
 }
+
+TEST_CASE("winRate and profitFactor summarize closed (filled sell) trades", "[metrics]") {
+    Account acct(10000.0);
+
+    // Four closed trades: two winners (+100, +200), two losers (-50, -25).
+    Trade win1; win1.side = 1; win1.filled = true; win1.realizedPnL = 100.0;
+    Trade loss1; loss1.side = 1; loss1.filled = true; loss1.realizedPnL = -50.0;
+    Trade win2; win2.side = 1; win2.filled = true; win2.realizedPnL = 200.0;
+    Trade loss2; loss2.side = 1; loss2.filled = true; loss2.realizedPnL = -25.0;
+    // A buy (side==0) and an unfilled sell -- neither counts as "closed".
+    Trade buy; buy.side = 0; buy.filled = true; buy.realizedPnL = 0.0;
+    Trade unfilledSell; unfilledSell.side = 1; unfilledSell.filled = false; unfilledSell.realizedPnL = 0.0;
+
+    std::unordered_map<long int, Trade> history{
+        {1, win1}, {2, loss1}, {3, win2}, {4, loss2}, {5, buy}, {6, unfilledSell}
+    };
+    Metrics calc(acct, history, {});
+
+    // 2 of 4 closed trades won -> 50%
+    REQUIRE(calc.winRate() == Catch::Approx(50.0));
+    // grossProfit=300, grossLoss=75 -> 300/75 = 4.0
+    REQUIRE(calc.profitFactor() == Catch::Approx(4.0));
+}
+
+TEST_CASE("winRate and profitFactor are well-defined with no closed trades", "[metrics]") {
+    Account acct(10000.0);
+    std::unordered_map<long int, Trade> history; // empty
+    Metrics calc(acct, history, {});
+
+    REQUIRE(calc.winRate() == Catch::Approx(0.0));
+    REQUIRE(calc.profitFactor() == Catch::Approx(-1.0)); // sentinel: undefined
+}
+
+TEST_CASE("profitFactor is a sentinel when there are no losing trades to divide by", "[metrics]") {
+    Account acct(10000.0);
+    Trade win1; win1.side = 1; win1.filled = true; win1.realizedPnL = 100.0;
+    Trade win2; win2.side = 1; win2.filled = true; win2.realizedPnL = 50.0;
+    std::unordered_map<long int, Trade> history{{1, win1}, {2, win2}};
+    Metrics calc(acct, history, {});
+
+    REQUIRE(calc.winRate() == Catch::Approx(100.0));
+    REQUIRE(calc.profitFactor() == Catch::Approx(-1.0)); // sentinel: no losses
+}

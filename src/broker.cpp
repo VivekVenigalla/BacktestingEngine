@@ -273,20 +273,24 @@ void Broker::processOrder(int id, Order order){
                 //sell all
                 tempTrade.filled = true;
                 tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " ALL FOR " + " " + std::to_string(currPrice);
-                
+
+                double preSaleAEP = user.positionAEP(order.ticker);
                 user.sellAllPosition(order.ticker, currPrice);
-                
+                tempTrade.realizedPnL = (currPrice - preSaleAEP) * order.quantity;
+
                 tempTrade.currBalance = user.checkBalance();
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
                 std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
-                
+
             }
             else if(user.positionQuantity(order.ticker) > order.quantity){
                 tempTrade.filled = true;
                 tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
-                
+
+                double preSaleAEP = user.positionAEP(order.ticker);
                 user.sellPositionQuantity(order.ticker, order.quantity, currPrice);
-                
+                tempTrade.realizedPnL = (currPrice - preSaleAEP) * order.quantity;
+
                 tempTrade.currBalance = user.checkBalance();
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
                 std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";

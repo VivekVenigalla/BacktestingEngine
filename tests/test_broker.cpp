@@ -235,3 +235,38 @@ TEST_CASE("a limit order that hasn't reached its trigger price stays pending", "
     REQUIRE(broker.returnOrders().count(id) == 1); // still pending
     REQUIRE(broker.returnHistory().count(id) == 0); // no trade recorded yet
 }
+
+TEST_CASE("processOrder computes realizedPnL for a sell relative to the pre-sale average entry price", "[broker]") {
+    Account acct(100000.0);
+    acct.buyNewPosition("AAPL", 50, 90.0); // 50 shares @ AEP 90.0
+
+    Bar bar;
+    bar.ticker = "AAPL";
+    bar.date = "2024-01-01";
+    bar.open = 100.0;
+    bar.high = 100.0;
+    bar.low = 100.0;
+    bar.close = 100.0;
+    bar.volume = 1000;
+
+    std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
+    Broker broker(acct, bars, /*commission*/0.0, /*slippage*/0.0, "b");
+
+    SECTION("partial sell") {
+        Order order{"AAPL", "market", 1, 20, -1};
+        int id = broker.createOrder(order);
+        broker.checkLoop();
+
+        // execPrice = open*(1-0) - 0 = 100.0; realizedPnL = (100-90)*20 = 200.0
+        REQUIRE(broker.returnHistory()[id].realizedPnL == Catch::Approx(200.0));
+    }
+
+    SECTION("sell all") {
+        Order order{"AAPL", "market", 1, 50, -1};
+        int id = broker.createOrder(order);
+        broker.checkLoop();
+
+        // realizedPnL = (100-90)*50 = 500.0
+        REQUIRE(broker.returnHistory()[id].realizedPnL == Catch::Approx(500.0));
+    }
+}

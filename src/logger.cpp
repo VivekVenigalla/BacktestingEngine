@@ -120,6 +120,8 @@ void Logger::exportJSON(fs::path filepath, std::string filename, Metrics& calcul
         metric["Trade_records"]["Number_of_trades"] = tradeNum;
         metric["Trade_records"]["Successful_trades"] = successfulTrade;
         metric["Trade_records"]["Unsuccessful_trades"] = unsucTrade;
+        metric["Trade_records"]["Win_rate"] = calculator.winRate();
+        metric["Trade_records"]["Profit_factor"] = calculator.profitFactor();
 
         //dump the json object in the file
         file << metric.dump(4);

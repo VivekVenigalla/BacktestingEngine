@@ -137,3 +137,46 @@ double Metrics::sortinoRatio(const std::vector<double>& returns, double riskFree
 double Metrics::benchmarkReturn(double startPrice, double endPrice) const{
     return (endPrice-startPrice)/startPrice * 100.0;
 }
+
+//a "closed" trade is a filled sell -- the point at which a realizedPnL exists
+double Metrics::winRate() const{
+    int closedTrades = 0;
+    int wins = 0;
+
+    for(const auto& [id, trade] : tradeHistory){
+        if(trade.side == 1 && trade.filled){
+            closedTrades++;
+            if(trade.realizedPnL > 0.0){
+                wins++;
+            }
+        }
+    }
+
+    if(closedTrades == 0){
+        return 0.0;
+    }
+
+    return (static_cast<double>(wins)/closedTrades) * 100.0;
+}
+
+double Metrics::profitFactor() const{
+    double grossProfit = 0.0;
+    double grossLoss = 0.0;
+
+    for(const auto& [id, trade] : tradeHistory){
+        if(trade.side == 1 && trade.filled){
+            if(trade.realizedPnL > 0.0){
+                grossProfit += trade.realizedPnL;
+            }
+            else if(trade.realizedPnL < 0.0){
+                grossLoss += -trade.realizedPnL;
+            }
+        }
+    }
+
+    if(grossLoss < 1e-9){
+        return -1.0; //undefined: no closed trades, or no losing trades to divide by
+    }
+
+    return grossProfit/grossLoss;
+}

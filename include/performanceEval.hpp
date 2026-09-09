@@ -32,6 +32,13 @@ class Metrics{
         //percentage return of a naive buy-and-hold over the same period, for comparison
         double benchmarkReturn(double startPrice, double endPrice) const;
 
+        //trade-level stats over tradeHistory's closed (filled sell) trades.
+        //winRate is 0-100; profitFactor is grossProfit/grossLoss, with -1.0 as an
+        //explicit "undefined" sentinel (no closed trades, or no losing trades to
+        //divide by) so the value stays a normal, JSON-serializable number.
+        double winRate() const;
+        double profitFactor() const;
+
     private:
         Account& user;
         std::unordered_map<long int, Trade>& tradeHistory;

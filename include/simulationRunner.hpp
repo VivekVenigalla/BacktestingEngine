@@ -17,6 +17,8 @@ using json = nlohmann::json;
 //step() in the .cpp for the exact order things happen in each bar, which
 //matters a lot for avoiding lookahead bias(using future information a real
 //trader wouldn't have had yet)
+
+//this class is created so the logic of the simulation progress is seperated from the main.cpp logic
 class SimulationRunner {
 
 

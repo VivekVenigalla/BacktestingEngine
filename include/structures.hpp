@@ -14,6 +14,9 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+//NOTE: includes in general basically mean that the code in 
+//that correpsonding .hpp file is directly pasted into the code
+
 //data considerations(keep in csv parser)
 //consider the width of time intervals for ohcl data
 
@@ -21,6 +24,9 @@
 //public by default(class defaults to private). these are used here since
 //Bar/Order/Position/Trade are just plain bundles of data with no need to
 //hide their fields from the rest of the program
+//these are useful for storing custom objects of data and tend to not have methods
+//that does not mean they cannot have methods
+//each of these structs has a print method for debugging purposes
 
 //one candle/bar of price data for a single ticker on a single date
 //ohlc = open, high, low, close - the four prices that summarize how a stock
@@ -36,26 +42,26 @@ struct Bar{
 
     //the "const" after a method means this function promises not to modify
     //any of the struct's fields. it only reads data and prints it, so
-    //marking it const lets you call print() even on a Bar you only have
-    //read-only(const) access to elsewhere in the code
     void print() const;
 };
 
 //a request to the broker to buy or sell shares. the strategy fills one of
 //these out and hands it to Broker::createOrder() - the strategy never
 //touches the account balance or positions directly, only the broker does
+//this prevents over reach bias and also allows simulation of slippage and 
+//logic for filling stop and limit orders in a seperate file
 struct Order{
     std::string ticker;
     //type is a plain string instead of a proper enum(a fixed list of named
     //values) for simplicity, but it only ever holds one of:
     //market - execute immediately at the current price, no target price
     //limit - only buy at or below(or sell at or above) a target price
-    //stop - only trigger once price crosses a target, then trade at market
-    std::string type;
-    //side is an int standing in for buy(0) or sell(1) instead of a proper
-    //enum or bool - same simplicity tradeoff as type above
-    int side;
-    long quantity;
+    //stop - only trigger once price crosses a target, 
+    //then trade at market(best possible price)
+    std::string type; 
+    int side; //side is an int standing in for buy(0) or sell(1) instead of a proper
+    long quantity; //quantity as a integer
+    //(this market does not allow partial orders)
     //the target price for limit/stop orders. market orders don't use one,
     //so checkPrice is set to -1 as a "not applicable" placeholder
     double checkPrice;
@@ -69,7 +75,7 @@ struct Order{
 struct Position{
     std::string ticker;
     long quantity;
-    double average_entry_price;
+    double average_entry_price; //average price for each buy order
 
     void print() const;
 //add more if needed
@@ -87,8 +93,11 @@ struct History{
     //handles multiple tickers - each element of "bars" and "positions" is a
     //map from ticker name to that ticker's Bar/Position on that date, so a
     //multi-asset simulation can log more than one instrument per snapshot
+
+    //since the logger synchronizes all the values at a particular instant, 
+    //we can use vectors and rely on their index values given from the date vector
     std::vector<std::string> dates;
-    std::vector<std::unordered_map<std::string, Bar>> bars;
+    std::vector<std::unordered_map<std::string, Bar>> bars; //bars for each data feed
     std::vector<double> balances;
     std::vector<double> totalEquity;
     std::vector<double> drawDown;

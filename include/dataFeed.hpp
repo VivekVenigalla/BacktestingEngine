@@ -31,6 +31,7 @@ class Data{
         //this class remember "which bar are we currently on" across
         //separate calls to nextBar()/getBar(), instead of forgetting its
         //position the moment each function returns
+        //this iterator is used to return references for the entire engine to work
         std::map<std::string, Bar>::iterator currBar;
         std::map<std::string, Bar> data;
         //Parser parser; is composition("Data HAS-A Parser") rather than

@@ -2,8 +2,7 @@
 #include <structures.hpp>
 #include "./account.hpp"
 //includes map and string
-
-//we include this file since the broker connects to the account to fulfill transactions
+//we include the account header file since the broker connects to the account to fulfill transactions
 
 //types of orders
 //simple market buy or sell
@@ -23,7 +22,9 @@ class Broker{
     public:
         //Account& and the unordered_map& below are references, not copies -
         //a reference is like a nickname for a variable that already exists
-        //somewhere else. writing "Account& account" as a parameter means
+        //it stores the memory address of the variable and not the actual value itself, but you can use the variable like it has the value
+        //useful for having connections of different shared properties
+        //writing "Account& account" as a parameter means
         //this Broker doesn't get its own separate Account, it shares the
         //exact same one the caller has - so when Broker changes the
         //balance, the caller's Account object changes too, and there's no
@@ -49,7 +50,8 @@ class Broker{
         //main functions to be used by central governing script
         void checkLoop();
 
-        void reset();
+        void reset(); //resets order book for other strategies
+
         //getter methods
         std::unordered_map<long int, Trade>& returnHistory();
         std::unordered_map<long int, Order>& returnOrders();

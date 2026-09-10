@@ -150,7 +150,7 @@ double Metrics::sortinoRatio(const std::vector<double>& returns, double riskFree
 
     //same idea as sharpe's standard deviation above, but std::min(0.0, ...)
     //clamps every WINNING period's contribution to exactly 0 before
-    //squaring it - so only losing periods(where r-riskFreeRate is
+    //squaring it - so only LOSING periods(where r-riskFreeRate is
     //negative) actually add anything to sumSquaredDownside. that's what
     //makes this "downside" deviation instead of plain standard deviation
     double sumSquaredDownside = 0.0;

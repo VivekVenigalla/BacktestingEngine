@@ -27,6 +27,11 @@
 #include "nlohmann/json.hpp"
 #include "projectPaths.hpp"
 #include <filesystem>
+//as mentioned in another file, the include statements tell the compiler to
+//copy and paste the code from that file into this file for compiling
+//NOTE: we use header files for our include statements so we don't
+//have to copy and paste the definitios of all the methods.
+
 
 namespace fs = std::filesystem;
 

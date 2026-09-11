@@ -124,14 +124,41 @@ bool Broker::checkOrder(Order& check){
     }
     //sell
     else{
-        long tempShares = user.positionQuantity(check.ticker);
-        if(check.quantity > tempShares){
-            return false;
-        }
-        else{
+        //a sell can do two different things depending on how much of the
+        //ticker is currently held: "coveringQty" is the part that just
+        //closes an existing long (needs nothing extra - you already own
+        //those shares), and "shortQty" is whatever's left over once the
+        //held long is exhausted, which opens or extends a short instead
+        long currentQty = user.positionQuantity(check.ticker);
+        long heldLong = std::max(currentQty, 0L);
+        long coveringQty = std::min(check.quantity, heldLong);
+        long shortQty = check.quantity - coveringQty;
+
+        if(shortQty == 0){
+            //fully covered by shares already held - identical to the
+            //original(pre-shorting) behavior for this case
             return true;
         }
 
+        //opening/extending a short with the "shortQty" leftover -- MVP
+        //guardrail: require 100% cash collateral up front(no margin, no
+        //borrow interest). to short $1,000 of stock, $1,000 of cash has to
+        //already be sitting in the account. this reuses the same
+        //"can you afford this" shape the buy branch above already uses
+        double tempBalance = user.checkBalance();
+        double price;
+        Bar& currBar = currBars[check.ticker];
+        if(check.type == "market"){
+            price = currBar.open;
+        }
+        else if(check.type == "limit"){
+            price = check.checkPrice;
+        }
+        else{
+            price = currBar.close;
+        }
+
+        return tempBalance >= price*shortQty + commisionFee;
     }
 }
 
@@ -309,8 +336,30 @@ void Broker::processOrder(int id, Order order){
     //check if position exists on user account or not and fill out order
     if(user.checkPosition(order.ticker)){
         if(order.side == 0){
+            //if the account is currently short this ticker, some (or all)
+            //of this buy covers that short instead of just adding to a
+            //long -- "heldShort" is how much short exists to cover,
+            //"coveredQty" is however much of THIS order actually covers it
+            long oldQty = user.positionQuantity(order.ticker);
+            double preBuyAEP = user.positionAEP(order.ticker);
+            long heldShort = std::max(-oldQty, 0L);
+            long coveredQty = std::min(order.quantity, heldShort);
+
             tempTrade.filled = true;
             tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: BUY " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
+
+            if(coveredQty > 0){
+                //covering a short realizes P&L on the covered portion --
+                //the sign is flipped relative to a long's realizedPnL
+                //formula elsewhere in this file, since a short profits
+                //when price FALLS, not rises
+                tempTrade.realizedPnL = (preBuyAEP - currPrice) * coveredQty - commisionFee;
+            }
+            else{
+                //nothing to cover - a plain add to an existing long never
+                //realizes P&L, same as before this fix
+                tempTrade.realizedPnL = 0.0;
+            }
 
             user.buyPositionQuantity(order.ticker, order.quantity, currPrice);
             //commission is its own explicit ledger deduction now, separate
@@ -354,18 +403,62 @@ void Broker::processOrder(int id, Order order){
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
                 std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
             }
-            //should not occur due to logic but just in case
+            //order.quantity exceeds however much is currently held long
+            //(possibly 0, possibly already short) -- this either opens a
+            //fresh short from flat, extends an existing short further, or
+            //(if currently long) sells past the held long and flips
+            //through zero into a brand new short
             else{
-                return;
+                long oldQty = user.positionQuantity(order.ticker);
+                double preSaleAEP = user.positionAEP(order.ticker);
+
+                tempTrade.filled = true;
+                tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
+
+                if(oldQty > 0){
+                    //the first oldQty shares close the existing long
+                    //(realizing P&L on that portion, same formula the
+                    //other sell branches above use); the leftover shares
+                    //open a fresh short and realize nothing, since opening
+                    //a position never realizes P&L
+                    tempTrade.realizedPnL = (currPrice - preSaleAEP) * oldQty - commisionFee;
+                }
+                else{
+                    //already flat or short - the entire sale just opens or
+                    //extends the short, nothing is being closed
+                    tempTrade.realizedPnL = 0.0;
+                }
+
+                user.sellPositionQuantity(order.ticker, order.quantity, currPrice);
+                user.modifyBalance(-commisionFee);
+
+                tempTrade.currBalance = user.checkBalance();
+                std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
+                std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
             }
         }
     }
-    //if position does not exist(create new position or output error if selling)
+    //if position does not exist(create new position or open a short directly)
     else{
         if(order.side == 1){
-            tempTrade.filled = false;
-            tempTrade.status = "ORDER " + std::to_string(id) + " FAILED TO FILL: ATTEMPT TO SELL POSITION THAT DOES NOT EXIST";
+            //in practice this branch is close to unreachable: checkOrder
+            //already reads positionQuantity(ticker) before every order is
+            //even accepted, which auto-vivifies a zero-quantity position
+            //entry via the map's operator[] -- so by the time an order
+            //reaches processOrder, checkPosition is basically always true
+            //already. kept short-aware anyway for defensiveness/consistency:
+            //buyNewPosition's math is already sign-correct for a negative
+            //(short) quantity, so it's reused here rather than duplicating it
+            tempTrade.filled = true;
+            tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: SELL " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
+            tempTrade.realizedPnL = 0.0;
+
+            user.buyNewPosition(order.ticker, -order.quantity, currPrice);
+            user.modifyBalance(-commisionFee);
+
+            tempTrade.currBalance = user.checkBalance();
             std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
+            std::cout << "CURRENT BALANCE: " <<  tempTrade.currBalance << "\n";
         }
         else{
             tempTrade.filled = true;

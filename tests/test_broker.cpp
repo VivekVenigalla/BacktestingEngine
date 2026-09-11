@@ -83,9 +83,41 @@ TEST_CASE("checkOrder rejects a buy order when balance is insufficient", "[broke
     REQUIRE(broker.returnHistory()[id].filled == false);
 }
 
-TEST_CASE("checkOrder rejects a sell order when shares are insufficient", "[broker]") {
-    Account acct(100000.0); //plenty of cash, but zero AAPL shares
-    std::unordered_map<std::string, Bar> bars;
+TEST_CASE("checkOrder accepts a sell order with zero shares held as a new short, given enough cash collateral", "[broker]") {
+    //before short-selling support, this exact setup(ample cash, zero
+    //shares) was always rejected outright - now that shorting is allowed,
+    //it's a perfectly valid way to open one, since the account can afford
+    //the 100%-cash-collateral guardrail (see checkOrder's sell branch)
+    Account acct(100000.0); //plenty of cash, zero AAPL shares
+    std::unordered_map<std::string, Bar> bars; //empty: auto-vivifies a $0 bar, so any cash balance covers it
+    Broker broker(acct, bars);
+
+    Order order;
+    order.ticker = "AAPL";
+    order.type = "market";
+    order.side = 1;
+    order.quantity = 10;
+    order.checkPrice = -1;
+
+    int id = broker.createOrder(order);
+
+    REQUIRE(broker.returnOrders().count(id) == 1); //accepted as a pending short-opening sell
+}
+
+TEST_CASE("checkOrder rejects a short-opening sell when there isn't enough cash collateral", "[broker]") {
+    Bar bar;
+    bar.ticker = "AAPL";
+    bar.date = "2024-01-01";
+    bar.open = 100.0;
+    bar.high = 100.0;
+    bar.low = 100.0;
+    bar.close = 100.0;
+    bar.volume = 1000;
+
+    //shorting 10 shares @ $100 needs $1000 of cash collateral - this
+    //account only has $500
+    Account acct(500.0);
+    std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
     Broker broker(acct, bars);
 
     Order order;
@@ -290,5 +322,51 @@ TEST_CASE("processOrder computes realizedPnL for a sell relative to the pre-sale
 
         //realizedPnL = (100-90)*50 = 500.0
         REQUIRE(broker.returnHistory()[id].realizedPnL == Catch::Approx(500.0));
+    }
+}
+
+TEST_CASE("a full short-then-cover cycle realizes P&L correctly through checkLoop", "[broker]") {
+    Bar bar;
+    bar.ticker = "AAPL";
+    bar.date = "2024-01-01";
+    bar.open = 100.0;
+    bar.high = 100.0;
+    bar.low = 100.0;
+    bar.close = 100.0;
+    bar.volume = 1000;
+
+    Account acct(100000.0);
+    std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
+    Broker broker(acct, bars, /*commission*/0.0, /*slippage*/0.0, "b");
+
+    //open a short from flat: sell 50 shares with none currently held
+    Order shortOrder{"AAPL", "market", 1, 50, -1};
+    int shortId = broker.createOrder(shortOrder);
+    broker.checkLoop();
+
+    REQUIRE(broker.returnHistory()[shortId].filled == true);
+    REQUIRE(acct.positionQuantity("AAPL") == -50);
+    REQUIRE(acct.positionAEP("AAPL") == Catch::Approx(100.0));
+
+    SECTION("covering at a lower price realizes a profit") {
+        bars["AAPL"].open = 80.0; //price fell - a short profits when covered lower
+        Order coverOrder{"AAPL", "market", 0, 50, -1};
+        int coverId = broker.createOrder(coverOrder);
+        broker.checkLoop();
+
+        //(preBuyAEP - currPrice)*coveredQty = (100-80)*50 = 1000.0
+        REQUIRE(broker.returnHistory()[coverId].realizedPnL == Catch::Approx(1000.0));
+        REQUIRE(acct.positionQuantity("AAPL") == 0);
+    }
+
+    SECTION("covering at a higher price realizes a loss") {
+        bars["AAPL"].open = 110.0; //price rose - a short loses when covered higher
+        Order coverOrder{"AAPL", "market", 0, 50, -1};
+        int coverId = broker.createOrder(coverOrder);
+        broker.checkLoop();
+
+        //(100-110)*50 = -500.0
+        REQUIRE(broker.returnHistory()[coverId].realizedPnL == Catch::Approx(-500.0));
+        REQUIRE(acct.positionQuantity("AAPL") == 0);
     }
 }

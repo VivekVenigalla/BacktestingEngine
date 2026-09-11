@@ -50,6 +50,56 @@ TEST_CASE("accountValue sums cash and multiple ticker positions", "[account]") {
     REQUIRE(acct.accountValue(prices) == Catch::Approx(10150.0));
 }
 
+//--- Short-selling: a negative Position::quantity means "short" throughout
+//this codebase. buyNewPosition is already sign-agnostic (confirmed during
+//Phase 3 planning - "balance -= quantity*entryPrice" correctly CREDITS
+//cash for a negative quantity), so it doubles as "open a short directly"
+//in the tests below, standing in for whatever earlier trade actually put
+//the account short in a real run ---
+
+TEST_CASE("sellPositionQuantity opens a short from flat and sets its AEP to the fill price", "[account]") {
+    Account acct(10000.0);
+    acct.sellPositionQuantity("AAPL", 50, 100.0); //balance: 10000 + 50*100 = 15000
+
+    REQUIRE(acct.positionQuantity("AAPL") == -50);
+    REQUIRE(acct.positionAEP("AAPL") == Catch::Approx(100.0));
+    REQUIRE(acct.checkBalance() == Catch::Approx(15000.0));
+}
+
+TEST_CASE("sellPositionQuantity extending an existing short blends the new shares into its AEP", "[account]") {
+    Account acct(10000.0);
+    acct.buyNewPosition("AAPL", -50, 100.0);      //short 50 @ AEP 100, balance: 10000+5000=15000
+    acct.sellPositionQuantity("AAPL", 20, 110.0); //extends the short by 20 more @ 110
+
+    REQUIRE(acct.positionQuantity("AAPL") == -70);
+    //weighted like a long's AEP, just by short size: (50*100+20*110)/70
+    REQUIRE(acct.positionAEP("AAPL") == Catch::Approx(102.857142857).margin(0.0001));
+    REQUIRE(acct.checkBalance() == Catch::Approx(17200.0));
+}
+
+TEST_CASE("buyPositionQuantity partially covers a short and leaves its AEP unchanged", "[account]") {
+    Account acct(10000.0);
+    acct.buyNewPosition("AAPL", -50, 100.0);     //short 50 @ AEP 100, balance: 15000
+    acct.buyPositionQuantity("AAPL", 20, 90.0);  //covers 20 of the 50 short shares
+
+    REQUIRE(acct.positionQuantity("AAPL") == -30);
+    //covering part of a short doesn't touch the AEP of the shares still
+    //held short, same principle as partially selling a long
+    REQUIRE(acct.positionAEP("AAPL") == Catch::Approx(100.0));
+    REQUIRE(acct.checkBalance() == Catch::Approx(13200.0)); //15000 - 20*90
+}
+
+TEST_CASE("buyPositionQuantity covering a short past zero opens a fresh long at the fill price", "[account]") {
+    Account acct(10000.0);
+    acct.buyNewPosition("AAPL", -50, 100.0);     //short 50 @ AEP 100, balance: 15000
+    acct.buyPositionQuantity("AAPL", 70, 90.0);  //covers all 50 short shares + opens a 20-share long
+
+    REQUIRE(acct.positionQuantity("AAPL") == 20);
+    //the short contributed nothing to the new long's cost basis
+    REQUIRE(acct.positionAEP("AAPL") == Catch::Approx(90.0));
+    REQUIRE(acct.checkBalance() == Catch::Approx(8700.0)); //15000 - 70*90
+}
+
 TEST_CASE("reset restores the initial balance and zeroes position quantities", "[account]") {
     //Only the 3-arg constructor records an `initial` balance for reset() to
     //restore to -- the 1-arg constructor never sets it (it stays 0.0).

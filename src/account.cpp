@@ -79,16 +79,62 @@ void Account::buyNewPosition(std::string ticker, long quantity, double entryPric
 //oldQuantity/oldAEP have to be read BEFORE quantity gets updated below,
 //since the formula needs the position's state as it was right before this
 //buy, not after
+//
+//a buy can mean three different things depending on the position's sign
+//BEFORE this trade: extending/opening a long(oldQuantity>=0, the case the
+//formula above was written for), partially/fully covering an existing
+//short without flipping past it(newQuantity<=0 - the short's AEP should
+//stay exactly what it was, the same way reducing a long doesn't touch its
+//AEP either), or covering a short AND opening a fresh long with the
+//leftover shares in the same trade(newQuantity>0 despite oldQuantity<0) -
+//the short contributed nothing to that new long's cost basis, so its AEP
+//is simply this trade's price
 void Account::buyPositionQuantity(std::string ticker, long quantityChange, double entryPrice){
     long oldQuantity = positions[ticker].quantity;
     double oldAEP = positions[ticker].average_entry_price;
-    positions[ticker].quantity += quantityChange;
-    positions[ticker].average_entry_price = (oldQuantity*oldAEP + quantityChange*entryPrice) / (oldQuantity + quantityChange);
+    long newQuantity = oldQuantity + quantityChange;
+
+    if(oldQuantity >= 0){
+        positions[ticker].average_entry_price = (oldQuantity*oldAEP + quantityChange*entryPrice) / (oldQuantity + quantityChange);
+    }
+    else if(newQuantity <= 0){
+        //still short(or exactly flat) after covering - average_entry_price
+        //left unchanged
+    }
+    else{
+        positions[ticker].average_entry_price = entryPrice;
+    }
+
+    positions[ticker].quantity = newQuantity;
     balance -= quantityChange*entryPrice;
 }
 
+//mirrors buyPositionQuantity above, just for the sell side: reducing an
+//existing long(newQuantity>=0) leaves its AEP untouched, while
+//opening/extending a short(oldQuantity<=0) blends the new shares' price
+//into the short's AEP the same weighted-average way a long does - just
+//weighted by the short's magnitude(-oldQuantity) instead of a positive
+//quantity. selling past a held long into a fresh short blends neither -
+//the long contributed nothing to the new short's cost basis, so the new
+//AEP is simply this trade's price
 void Account::sellPositionQuantity(std::string ticker, long quantityChange, double currentPrice){
-    positions[ticker].quantity -= quantityChange;
+    long oldQuantity = positions[ticker].quantity;
+    double oldAEP = positions[ticker].average_entry_price;
+    long newQuantity = oldQuantity - quantityChange;
+
+    if(oldQuantity <= 0){
+        long oldShortSize = -oldQuantity;
+        positions[ticker].average_entry_price = (oldShortSize*oldAEP + quantityChange*currentPrice) / (oldShortSize + quantityChange);
+    }
+    else if(newQuantity >= 0){
+        //still long(or exactly flat) after selling - average_entry_price
+        //left unchanged
+    }
+    else{
+        positions[ticker].average_entry_price = currentPrice;
+    }
+
+    positions[ticker].quantity = newQuantity;
     balance += quantityChange*currentPrice;
 }
 

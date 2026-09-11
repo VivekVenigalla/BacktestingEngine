@@ -268,6 +268,54 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
     }
 }
 
+TEST_CASE("stop_limit orders trigger like a plain stop but fill as a limit at limitPrice", "[broker]") {
+    Bar bar;
+    bar.ticker = "AAPL";
+    bar.date = "2024-01-01";
+    bar.high = 110.0;
+    bar.low = 90.0;
+    bar.close = 100.0;
+    bar.volume = 1000;
+
+    const double commission = 0.0;
+    const double slippage = 0.0;
+
+    SECTION("open hasn't gapped past the limit - fill is bounded by open") {
+        bar.open = 100.0;
+        Account acct(100000.0);
+        std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
+        Broker broker(acct, bars, commission, slippage, "b");
+
+        //checkPrice(95) is the stop TRIGGER - high(110) >= 95 fires it, same
+        //trigger checkOrderLimitAndStop already uses for a plain stop.
+        //limitPrice(105) is only checked once triggered
+        Order order{"AAPL", "stop_limit", 0, 10, 95.0, 105.0};
+        int id = broker.createOrder(order);
+        broker.checkLoop();
+
+        REQUIRE(broker.returnHistory()[id].filled == true);
+        //min(limitPrice, open) = min(105,100) = 100
+        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(100.0));
+    }
+
+    SECTION("open has gapped past the limit - fill is capped at limitPrice") {
+        bar.open = 108.0; //gapped above the 105 limit
+        Account acct(100000.0);
+        std::unordered_map<std::string, Bar> bars{{"AAPL", bar}};
+        Broker broker(acct, bars, commission, slippage, "b");
+
+        Order order{"AAPL", "stop_limit", 0, 10, 95.0, 105.0};
+        int id = broker.createOrder(order);
+        broker.checkLoop();
+
+        REQUIRE(broker.returnHistory()[id].filled == true);
+        //min(limitPrice, open) = min(105,108) = 105 - capped at the limit,
+        //demonstrably different from a plain stop, which would fill at
+        //max(checkPrice, open) = max(95,108) = 108 instead
+        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(105.0));
+    }
+}
+
 TEST_CASE("a limit order that hasn't reached its trigger price stays pending", "[broker]") {
     Bar bar;
     bar.ticker = "AAPL";

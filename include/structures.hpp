@@ -65,6 +65,14 @@ struct Order{
     //the target price for limit/stop orders. market orders don't use one,
     //so checkPrice is set to -1 as a "not applicable" placeholder
     double checkPrice;
+    //only meaningful for type=="stop_limit": checkPrice is still the stop
+    //TRIGGER price(same as a plain stop order), but once triggered, the
+    //order fills as a limit at limitPrice instead of at market. defaulted
+    //to -1("not applicable") so every existing Order{...} aggregate
+    //initialization elsewhere in the codebase keeps compiling unchanged -
+    //this new field just falls back to its default when a caller doesn't
+    //list it
+    double limitPrice = -1;
 
     void print() const;
 };
@@ -121,6 +129,9 @@ struct Trade{
     int side;
     long quantity;
     double checkPrice;
+    //mirrors Order::limitPrice above, for stop_limit trades only - see
+    //that field's comment for what it means
+    double limitPrice = -1;
     //figure out the commmision calculation
     double commision;
     //true if the broker actually filled this trade, false if it was

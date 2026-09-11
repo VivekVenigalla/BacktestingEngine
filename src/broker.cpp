@@ -315,13 +315,41 @@ void Broker::processOrder(int id, Order order){
             currPrice = (std::max(order.checkPrice, currBar.open))*(1.0-slippageRate);
         }
     }
-    else{
+    else if(order.type == "stop"){
         if(order.side ==0){
             currPrice = (std::max(order.checkPrice, currBar.open))*(1.0+slippageRate);
         }
         else{
             currPrice = (std::min(order.checkPrice, currBar.open))*(1.0-slippageRate);
         }
+    }
+    else if(order.type == "stop_limit"){
+        //checkOrderLimitAndStop's trigger condition is identical to a
+        //plain stop's(needs no changes there - see that function) - the
+        //only difference is what happens once triggered: a plain stop
+        //fills at market, this fills as a LIMIT at limitPrice instead,
+        //bounded against the bar's open the same way the "limit" type
+        //above is bounded against checkPrice
+        //
+        //known simplification, consistent with this engine's existing
+        //single-open-price-per-bar model: this always fills once
+        //triggered. it doesn't model a bar that gaps straight through
+        //limitPrice, where a real stop-limit could fail to fill at all
+        if(order.side ==0){
+            currPrice = (std::min(order.limitPrice, currBar.open))*(1.0+slippageRate);
+        }
+        else{
+            currPrice = (std::max(order.limitPrice, currBar.open))*(1.0-slippageRate);
+        }
+    }
+    else{
+        //defensive fallback: every non-market/non-limit type used to fall
+        //into one shared "else" here, so a typo'd type string(e.g.
+        //"stpo") would silently behave exactly like a stop order without
+        //any warning. now that "stop_limit" is a real type sharing this
+        //same space, that silent-fallback footgun is worse than before, so
+        //an unrecognized type is caught explicitly here instead
+        currPrice = currBar.open;
     }
 
     //create trade histroy record

@@ -10,6 +10,7 @@ add_executable(unit_tests
     test_createstrat.cpp
     test_logger.cpp
     test_strategy.cpp
+    test_pathutils.cpp
 )
 target_link_libraries(unit_tests PRIVATE backtest_core Catch2::Catch2WithMain)
 

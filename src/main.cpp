@@ -24,6 +24,7 @@
 #include "../include/performanceEval.hpp"
 #include "../include/simulationRunner.hpp"
 #include "../include/logger.hpp"
+#include "../include/pathUtils.hpp"
 #include "nlohmann/json.hpp"
 #include "projectPaths.hpp"
 #include <filesystem>
@@ -100,7 +101,10 @@ int main(int argc, char* argv[]) {
         //fill up the variables above
         tickers[feedID] = feed["ticker"].get<std::string>();
         tempTickers.push_back(feedID);
-        paths[feedID] = feed["csv_filepath"].get<std::string>();
+        //batch configs store csv_filepath relative to src/ (the convention
+        //csv_download.py/GUI.py both use) - resolving it here means ./runny
+        //works from any working directory, not just from inside src/
+        paths[feedID] = resolveFeedPath(feed["csv_filepath"].get<std::string>(), PROJECT_SOURCE_DIR);
     }
 
     //create the feeds object

@@ -33,6 +33,7 @@ add_library(backtest_core STATIC
     src/performanceEval.cpp
     src/logger.cpp
     src/simulationRunner.cpp
+    src/pathUtils.cpp
 )
 target_include_directories(backtest_core PUBLIC include ${CMAKE_BINARY_DIR}/generated)
 # PUBLIC (not PRIVATE): several public headers (createStrat.hpp,

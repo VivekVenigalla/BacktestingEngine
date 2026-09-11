@@ -145,6 +145,11 @@ struct Trade{
     //entry price the position had right before this sell. 0.0 for buys and
     //for trades that never filled, where a profit/loss doesn't apply
     double realizedPnL = 0.0;
+    //the bar date this trade happened on(copied straight from Bar::date,
+    //hence the same std::string type), so a trade can be placed back onto
+    //an equity curve's x-axis later. defaults to empty since it's set right
+    //alongside every other field wherever a Trade gets built
+    std::string date = "";
 
     void print() const;
 };

@@ -9,7 +9,12 @@
 //deliberately different from its side, so a wrong assignment is obvious.
 
 TEST_CASE("createOrder logs the order's actual side (not its quantity) when the order fails validation", "[broker]") {
-    Account acct(10.0); //too little balance to afford the order below
+    //commission is now a flat fee added once (not multiplied by quantity),
+    //so with a $0-priced bar (see the empty `bars` map below) the balance
+    //has to sit below the flat commisionFee itself for this order to
+    //genuinely fail -- $10 would incorrectly pass now that quantity no
+    //longer inflates the fee
+    Account acct(0.50); //too little balance to afford the order below
     std::unordered_map<std::string, Bar> bars; //empty: Broker will look up "AAPL" and get a zero-valued default Bar
     Broker broker(acct, bars);
 
@@ -54,7 +59,10 @@ TEST_CASE("deleteOrder logs the order's actual side (not its quantity) when canc
 //pinning down so a future change can't silently break them) ---
 
 TEST_CASE("checkOrder rejects a buy order when balance is insufficient", "[broker]") {
-    Account acct(5.0);
+    //same reasoning as the test above: against a $0-priced bar, the balance
+    //must be below the flat commisionFee itself to genuinely fail now that
+    //commission is a flat fee instead of being multiplied by quantity
+    Account acct(0.50);
     std::unordered_map<std::string, Bar> bars;
     Broker broker(acct, bars);
 
@@ -151,8 +159,10 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         broker.checkLoop();
 
         REQUIRE(broker.returnHistory()[id].filled == true);
-        //open*(1+slip)+commission = 100*1.01+1 = 102.0
-        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(102.0));
+        //execPrice is now pure slippage -- commisionFee is deducted
+        //separately as its own ledger entry, not baked into price per-share
+        //open*(1+slip) = 100*1.01 = 101.0
+        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(101.0));
     }
 
     SECTION("market sell") {
@@ -165,8 +175,8 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         int id = broker.createOrder(order);
         broker.checkLoop();
 
-        //open*(1-slip)-commission = 100*0.99-1 = 98.0
-        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(98.0));
+        //open*(1-slip) = 100*0.99 = 99.0
+        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(99.0));
     }
 
     SECTION("limit buy triggers when low <= checkPrice") {
@@ -179,8 +189,8 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         broker.checkLoop();
 
         REQUIRE(broker.returnHistory()[id].filled == true);
-        //min(checkPrice, open)*(1+slip)+commission = min(98,100)*1.01+1 = 99.98
-        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(99.98));
+        //min(checkPrice, open)*(1+slip) = min(98,100)*1.01 = 98.98
+        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(98.98));
     }
 
     SECTION("limit sell triggers when high >= checkPrice") {
@@ -193,8 +203,8 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         int id = broker.createOrder(order);
         broker.checkLoop();
 
-        //max(checkPrice, open)*(1-slip)-commission = max(102,100)*0.99-1 = 99.98
-        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(99.98));
+        //max(checkPrice, open)*(1-slip) = max(102,100)*0.99 = 100.98
+        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(100.98));
     }
 
     SECTION("stop buy triggers when high >= checkPrice") {
@@ -207,8 +217,8 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         broker.checkLoop();
 
         REQUIRE(broker.returnHistory()[id].filled == true);
-        //max(checkPrice, open)*(1+slip)+commission = max(104,100)*1.01+1 = 106.04
-        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(106.04));
+        //max(checkPrice, open)*(1+slip) = max(104,100)*1.01 = 105.04
+        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(105.04));
     }
 
     SECTION("stop sell triggers when low <= checkPrice") {
@@ -221,8 +231,8 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
         int id = broker.createOrder(order);
         broker.checkLoop();
 
-        //min(checkPrice, open)*(1-slip)-commission = min(96,100)*0.99-1 = 94.04
-        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(94.04));
+        //min(checkPrice, open)*(1-slip) = min(96,100)*0.99 = 95.04
+        REQUIRE(broker.returnHistory()[id].execPrice == Catch::Approx(95.04));
     }
 }
 

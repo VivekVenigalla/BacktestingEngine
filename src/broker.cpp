@@ -109,9 +109,11 @@ bool Broker::checkOrder(Order& check){
             currPrice = currBar.close;
 
         }
-        //add the commision fee
-        currPrice += commisionFee;
-        if(tempBalance >= currPrice*check.quantity){
+        //commisionFee is a flat per-trade dollar fee (see its declaration
+        //in broker.hpp), not a per-share one -- it has to be added ONCE,
+        //outside the *quantity multiply, or a 500-share order would need
+        //$500 of "commission" alone instead of the flat $1 it's supposed to be
+        if(tempBalance >= currPrice*check.quantity + commisionFee){
             return true;
         }
         else{
@@ -260,12 +262,18 @@ void Broker::processOrder(int id, Order order){
     //assign currPrice with either high or low depending on the order side and type
 
     //This implementation for the execPrice is shortsighted as we are using only 1 day intervals. change in the future
+
+    //execPrice below is pure slippage now -- commisionFee used to be baked
+    //in here per-share(the same bug checkOrder had above), which made the
+    //fee scale with quantity instead of staying flat. commission is now
+    //deducted once as its own explicit ledger entry further down, after
+    //Account's buy/sell call actually moves the shares
     if(order.type == "market"){
         if(order.side ==0){
-            currPrice = (currBar.open)*(1.0+slippageRate)+commisionFee;
+            currPrice = (currBar.open)*(1.0+slippageRate);
         }
         else{
-            currPrice = (currBar.open)*(1.0-slippageRate)-commisionFee;
+            currPrice = (currBar.open)*(1.0-slippageRate);
         }
     }
     else if(order.type == "limit"){
@@ -274,18 +282,18 @@ void Broker::processOrder(int id, Order order){
             //std::min/std::max just return whichever of the two numbers is
             //smaller/larger - here they pick the more favorable of the
             //bar's open price vs the order's target price
-            currPrice = (std::min(order.checkPrice, currBar.open))*(1.0+slippageRate)+commisionFee;
+            currPrice = (std::min(order.checkPrice, currBar.open))*(1.0+slippageRate);
         }
         else{
-            currPrice = (std::max(order.checkPrice, currBar.open))*(1.0-slippageRate)-commisionFee;
+            currPrice = (std::max(order.checkPrice, currBar.open))*(1.0-slippageRate);
         }
     }
     else{
         if(order.side ==0){
-            currPrice = (std::max(order.checkPrice, currBar.open))*(1.0+slippageRate)+commisionFee;
+            currPrice = (std::max(order.checkPrice, currBar.open))*(1.0+slippageRate);
         }
         else{
-            currPrice = (std::min(order.checkPrice, currBar.open))*(1.0-slippageRate)-commisionFee;
+            currPrice = (std::min(order.checkPrice, currBar.open))*(1.0-slippageRate);
         }
     }
 
@@ -305,6 +313,10 @@ void Broker::processOrder(int id, Order order){
             tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: BUY " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
 
             user.buyPositionQuantity(order.ticker, order.quantity, currPrice);
+            //commission is its own explicit ledger deduction now, separate
+            //from execPrice -- see the comment above processOrder's
+            //execPrice branches for why
+            user.modifyBalance(-commisionFee);
 
             tempTrade.currBalance = user.checkBalance();
             std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
@@ -321,7 +333,8 @@ void Broker::processOrder(int id, Order order){
                 //position below
                 double preSaleAEP = user.positionAEP(order.ticker);
                 user.sellAllPosition(order.ticker, currPrice);
-                tempTrade.realizedPnL = (currPrice - preSaleAEP) * order.quantity;
+                user.modifyBalance(-commisionFee);
+                tempTrade.realizedPnL = (currPrice - preSaleAEP) * order.quantity - commisionFee;
 
                 tempTrade.currBalance = user.checkBalance();
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
@@ -334,7 +347,8 @@ void Broker::processOrder(int id, Order order){
 
                 double preSaleAEP = user.positionAEP(order.ticker);
                 user.sellPositionQuantity(order.ticker, order.quantity, currPrice);
-                tempTrade.realizedPnL = (currPrice - preSaleAEP) * order.quantity;
+                user.modifyBalance(-commisionFee);
+                tempTrade.realizedPnL = (currPrice - preSaleAEP) * order.quantity - commisionFee;
 
                 tempTrade.currBalance = user.checkBalance();
                 std::cout << "ORDER STATUS: " << tempTrade.status << "\n";
@@ -358,6 +372,7 @@ void Broker::processOrder(int id, Order order){
             tempTrade.status = "ORDER " + std::to_string(id) + " FILLED: BUY " + order.ticker + " " + std::to_string(order.quantity) + " FOR " + " " + std::to_string(currPrice);
 
             user.buyNewPosition(order.ticker, order.quantity, currPrice);
+            user.modifyBalance(-commisionFee);
 
             tempTrade.currBalance = user.checkBalance();
             std::cout << "ORDER STATUS: " << tempTrade.status << "\n";

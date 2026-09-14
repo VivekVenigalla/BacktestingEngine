@@ -415,6 +415,13 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
                     #c++'s "cond ? a : b", just with the condition written
                     #in the middle instead of at the front
                     side_label = "BUY" if side_val == "0" else "SELL"
+                    #"true"/"false" here are literal strings written by the
+                    #c++ side's exportCSVTrade(a bool doesn't survive a trip
+                    #through a csv file - it's just text once it's on disk),
+                    #so this line converts that text back into a real python
+                    #bool, the same idea side_label applies one line above
+                    #just going the other direction(a 0/1 flag -> a label)
+                    filled_flag = str(row.get("Filled", "")).strip().lower() == "true"
                     results["trades"].append({
                         "id": row.get("TradeID"),
                         "ticker": row.get("TickerID"),
@@ -423,7 +430,18 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
                         "quantity": float(row.get("Quantity", 0)),
                         "commission": float(row.get("Commission", 0)),
                         "balance": float(row.get("CurrentBalance", 0)),
-                        "status": row.get("Status", "")
+                        "status": row.get("Status", ""),
+                        #the four fields below are read from columns that
+                        #existed in tradeData.csv all along(Type/Filled/
+                        #CheckPrice) or were only just added by the c++ side
+                        #(RealizedPnL/LimitPrice/Date) - none of the seven
+                        #fields above ever read them
+                        "type": row.get("Type", ""),
+                        "filled": filled_flag,
+                        "check_price": float(row.get("CheckPrice", 0)),
+                        "realized_pnl": float(row.get("RealizedPnL", 0)),
+                        "limit_price": float(row.get("LimitPrice", -1)),
+                        "date": row.get("Date", "")
                     })
         except Exception as e:
             print(f"[Results Error] Failed to parse trade CSV ({trade_path}): {e}")

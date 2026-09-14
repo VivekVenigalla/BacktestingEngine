@@ -1893,12 +1893,22 @@ def render_left_metrics_pane(sim_data):
     succ_trades = trade_recs.get("Successful_trades", 0)
     unsucc_trades = trade_recs.get("Unsuccessful_trades", 0)
 
-    #heads up: this recomputes win rate by hand from the raw trade counts -
-    #metricData.json now actually includes a ready-made "Win_rate" field
-    #directly(see Logger::exportJSON on the c++ side), so this could be
-    #simplified to metrics.get("Trade_records", {}).get("Win_rate", 0.0)
-    #instead. this python code predates that field being added
-    win_rate = (succ_trades / num_trades * 100) if num_trades > 0 else 0.0
+    #Win_rate is a ready-made field metricData.json has always included
+    #(see Logger::exportJSON on the c++ side) - reading it directly here
+    #replaces this file's old approach of hand-recomputing win rate from
+    #the raw succ_trades/num_trades counts above
+    win_rate = trade_recs.get("Win_rate", 0.0)
+
+    #sharpeRatio()/sortinoRatio() on the c++ side return plain ratios, not
+    #percentages - displayed as a bare number below, no "%" suffix
+    sharpe = metrics.get("SharpeRatio", 0.0)
+    sortino = metrics.get("SortinoRatio", 0.0)
+    #maxDrawdown()/benchmarkReturn() DO already return whole percentages
+    #(e.g -12.5 means -12.5%), same as cagr/tot_returns above - no extra
+    #*100 needed before displaying these
+    max_dd = metrics.get("MaxDrawdown", 0.0)
+    benchmark = metrics.get("BenchmarkReturn", 0.0)
+    profit_factor = trade_recs.get("Profit_factor", 0.0)
 
     # Color helpers (Green for positive, Red for negative)
     ret_color = [0, 255, 127] if tot_returns >= 0 else [255, 80, 80]
@@ -1908,11 +1918,20 @@ def render_left_metrics_pane(sim_data):
     dpg.set_value("ui_val_cagr", f"{cagr:.2f}%")
     dpg.set_value("ui_val_tot_returns", f"{tot_returns:.2f}%")
     dpg.configure_item("ui_val_tot_returns", color=ret_color)
-    
+
+    dpg.set_value("ui_val_sharpe", f"{sharpe:.2f}")
+    dpg.set_value("ui_val_sortino", f"{sortino:.2f}")
+    dpg.set_value("ui_val_max_dd", f"{max_dd:.2f}%")
+    dpg.set_value("ui_val_benchmark", f"{benchmark:.2f}%")
+
     dpg.set_value("ui_val_num_trades", str(num_trades))
     dpg.set_value("ui_val_succ_trades", str(succ_trades))
     dpg.set_value("ui_val_unsucc_trades", str(unsucc_trades))
     dpg.set_value("ui_val_win_rate", f"{win_rate:.1f}%")
+    #profitFactor() returns a -1.0 SENTINEL(not a real ratio) when there are
+    #no losing trades to divide by - printing that raw would look like a
+    #real "-1.00" profit factor, so it's special-cased to "N/A" instead
+    dpg.set_value("ui_val_profit_factor", "N/A" if profit_factor < 0 else f"{profit_factor:.2f}")
 
 #heads up: this re-import is a vestigial copy-paste artifact - "import
 #dearpygui.dearpygui as dpg" already happened once at the very top of this
@@ -2079,6 +2098,30 @@ def open_results_dashboard(batch_config):
                     dpg.add_text("0.0%", tag="ui_val_cagr")
 
                 dpg.add_spacer(height=15)
+                dpg.add_text("Risk & Benchmark Metrics", color=[255, 200, 100])
+                dpg.add_separator()
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Sharpe Ratio:")
+                    dpg.add_text("0.00", tag="ui_val_sharpe")
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Sortino Ratio:")
+                    dpg.add_text("0.00", tag="ui_val_sortino")
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Max Drawdown:")
+                    #a drawdown is always <=0(it measures a decline from a
+                    #peak), so this is colored red unconditionally, unlike
+                    #ui_val_tot_returns above which switches color based on
+                    #its actual sign
+                    dpg.add_text("0.00%", tag="ui_val_max_dd", color=[255, 80, 80])
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Benchmark Return:")
+                    dpg.add_text("0.00%", tag="ui_val_benchmark")
+
+                dpg.add_spacer(height=15)
                 dpg.add_text("Trade Statistics", color=[255, 200, 100])
                 dpg.add_separator()
 
@@ -2097,6 +2140,10 @@ def open_results_dashboard(batch_config):
                 with dpg.group(horizontal=True):
                     dpg.add_text("Unsuccessful Trades:")
                     dpg.add_text("0", tag="ui_val_unsucc_trades", color=[255, 80, 80])
+
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Profit Factor:")
+                    dpg.add_text("0.00", tag="ui_val_profit_factor")
 
             #right pane, chart container
             with dpg.child_window(tag="right_plot_container", width=-1, height=580, border=True):

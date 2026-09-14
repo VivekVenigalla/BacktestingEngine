@@ -1598,6 +1598,26 @@ with dpg.theme() as global_theme:
 #bind_theme actually applies the theme built above to the whole application
 dpg.bind_theme(global_theme)
 
+#two small, one-time themes just for the equity-curve trade markers added
+#in render_right_charts_pane below - built once here(same "build it once at
+#module scope" idea as global_theme above) rather than rebuilt every time
+#that function runs. mvThemeCat_Plots(instead of mvThemeCat_Core above) is
+#the category dearpygui uses for anything plot-related; mvPlotCol_Marker*
+#colors the marker itself, mvPlotStyleVar_Marker picks its shape - an
+#up-triangle for buys, a down-triangle for sells, so the two are tellable
+#apart even without reading the legend
+with dpg.theme() as buy_trade_theme:
+    with dpg.theme_component(dpg.mvScatterSeries):
+        dpg.add_theme_color(dpg.mvPlotCol_MarkerFill, [0, 255, 127], category=dpg.mvThemeCat_Plots)
+        dpg.add_theme_color(dpg.mvPlotCol_MarkerOutline, [0, 255, 127], category=dpg.mvThemeCat_Plots)
+        dpg.add_theme_style(dpg.mvPlotStyleVar_Marker, dpg.mvPlotMarker_Up, category=dpg.mvThemeCat_Plots)
+
+with dpg.theme() as sell_trade_theme:
+    with dpg.theme_component(dpg.mvScatterSeries):
+        dpg.add_theme_color(dpg.mvPlotCol_MarkerFill, [255, 80, 80], category=dpg.mvThemeCat_Plots)
+        dpg.add_theme_color(dpg.mvPlotCol_MarkerOutline, [255, 80, 80], category=dpg.mvThemeCat_Plots)
+        dpg.add_theme_style(dpg.mvPlotStyleVar_Marker, dpg.mvPlotMarker_Down, category=dpg.mvThemeCat_Plots)
+
 #keyboard configs
 #a handler_registry is dearpygui's way of listening for input that isn't
 #tied to one specific widget(a key press anywhere, rather than a click on
@@ -1962,6 +1982,42 @@ def render_right_charts_pane(sim_data):
     if dpg.does_item_exist("plot_render_group"):
         dpg.delete_item("plot_render_group", children_only=True)
 
+    #rebuild the trade log table for whichever sim is now selected. this
+    #runs unconditionally(not nested inside the "if not equities" check
+    #below) so a sim with trades but a still-empty equity curve wouldn't
+    #silently skip its trade log too
+    if dpg.does_item_exist("trade_log_table"):
+        #child-slot 1 is a table's rows(slot 0 would be its columns) - the
+        #same clearing idiom refresh_strategy_table and friends already use
+        #elsewhere in this file for their own tables
+        for item in dpg.get_item_children("trade_log_table", 1):
+            dpg.delete_item(item)
+
+        for trade in sim_data.get("trades", []):
+            pnl = trade.get("realized_pnl", 0.0)
+            #same green/red convention already used on ui_val_succ_trades/
+            #ui_val_unsucc_trades - default(no color override) when pnl is
+            #exactly 0, since that's neither a win nor a loss
+            pnl_color = [0, 255, 127] if pnl > 0 else ([255, 80, 80] if pnl < 0 else None)
+
+            with dpg.table_row(parent="trade_log_table"):
+                dpg.add_text(str(trade.get("id", "")))
+                dpg.add_text(str(trade.get("date", "")))
+                dpg.add_text(str(trade.get("ticker", "")))
+                dpg.add_text(str(trade.get("type", "")))
+                dpg.add_text(str(trade.get("side", "")))
+                dpg.add_text(str(trade.get("quantity", "")))
+                dpg.add_text(f"{trade.get('price', 0.0):.2f}")
+                #dpg.add_text(..., color=None) is the same as not passing
+                #color at all - it falls back to the theme's default text
+                #color, which is exactly what's wanted for a breakeven trade
+                if pnl_color is not None:
+                    dpg.add_text(f"{pnl:.2f}", color=pnl_color)
+                else:
+                    dpg.add_text(f"{pnl:.2f}")
+                dpg.add_text(f"{trade.get('balance', 0.0):.2f}")
+                dpg.add_text(str(trade.get("status", "")))
+
     #push new plot elements into plot group
     with dpg.group(parent="plot_render_group"):
         if not equities:
@@ -1979,6 +2035,43 @@ def render_right_charts_pane(sim_data):
             #series rendering
             dpg.add_line_series(x_indices, equities, label="Equity", parent=y_axis)
             dpg.add_line_series(x_indices, balances, label="Cash Balance", parent=y_axis)
+
+            #trade markers: {date_string: bar_index} lets each trade look up
+            #where it falls on the x_indices axis above in O(1), rather than
+            #scanning the whole dates list per trade. a multi-ticker sim's
+            #dynamicData.csv has one row per(date, ticker) pair, so a
+            #repeated date here just keeps the LAST matching bar index via
+            #this dict comprehension's natural overwrite behavior - a
+            #non-issue for this single-ticker batch, just worth knowing
+            dates = timeseries.get("dates", [])
+            date_to_index = {d: i for i, d in enumerate(dates)}
+
+            buy_x, buy_y, sell_x, sell_y = [], [], [], []
+            for trade in sim_data.get("trades", []):
+                #only a trade that actually filled represents a real
+                #portfolio event - an unfilled/rejected order's logged
+                #date/balance just reflect the bar it was EVALUATED at, not
+                #anything that actually happened, so plotting it as a
+                #marker would be misleading
+                if not trade.get("filled", False):
+                    continue
+                bar_index = date_to_index.get(trade.get("date", ""))
+                if bar_index is None:
+                    continue
+
+                if trade.get("side") == "BUY":
+                    buy_x.append(bar_index)
+                    buy_y.append(equities[bar_index])
+                else:
+                    sell_x.append(bar_index)
+                    sell_y.append(equities[bar_index])
+
+            if buy_x:
+                buy_series = dpg.add_scatter_series(buy_x, buy_y, label="Buys", parent=y_axis)
+                dpg.bind_item_theme(buy_series, buy_trade_theme)
+            if sell_x:
+                sell_series = dpg.add_scatter_series(sell_x, sell_y, label="Sells", parent=y_axis)
+                dpg.bind_item_theme(sell_series, sell_trade_theme)
 
         dpg.add_spacer(height=10)
 
@@ -2145,14 +2238,46 @@ def open_results_dashboard(batch_config):
                     dpg.add_text("Profit Factor:")
                     dpg.add_text("0.00", tag="ui_val_profit_factor")
 
-            #right pane, chart container
+            #right pane, chart + trade-log container. this window is only
+            #580 tall with the plots already stacked two-deep in it, so a
+            #third section(the trade log) has nowhere to fit alongside them
+            #without either growing the whole dashboard window or splitting
+            #the space - a dpg.tab_bar(the same convention this file's
+            #config-manager window already uses, e.g the "Strategies" tab
+            #just above) solves that without needing more screen space
             with dpg.child_window(tag="right_plot_container", width=-1, height=580, border=True):
-                dpg.add_text("Timeseries Performance Plots", color=[255, 200, 100])
-                dpg.add_separator()
+                with dpg.tab_bar():
+                    with dpg.tab(label="Charts"):
+                        dpg.add_text("Timeseries Performance Plots", color=[255, 200, 100])
+                        dpg.add_separator()
 
-                #placeholder for charts
-                with dpg.group(tag="plot_render_group"):
-                    dpg.add_text("Charts will render here...", color=[150, 150, 150])
+                        #placeholder for charts
+                        with dpg.group(tag="plot_render_group"):
+                            dpg.add_text("Charts will render here...", color=[150, 150, 150])
+
+                    with dpg.tab(label="Trade Log"):
+                        dpg.add_text("Every Order This Simulation Sent To The Broker", color=[255, 200, 100])
+                        dpg.add_separator()
+
+                        #scrollY=True + height=-1 makes this table scroll
+                        #internally within whatever room the tab gives it,
+                        #rather than pushing the whole window taller as more
+                        #rows get added - CheckPrice/LimitPrice/Filled/
+                        #Commission are deliberately left out of this visible
+                        #table to keep it fitting without horizontal
+                        #scrolling; they're still in sim_data["trades"] if
+                        #ever wanted here later
+                        with dpg.table(tag="trade_log_table", header_row=True, borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True, scrollY=True, height=-1):
+                            dpg.add_table_column(label="TradeID", width_fixed=True, init_width_or_weight=55)
+                            dpg.add_table_column(label="Date", width_fixed=True, init_width_or_weight=80)
+                            dpg.add_table_column(label="Ticker")
+                            dpg.add_table_column(label="Type", width_fixed=True, init_width_or_weight=70)
+                            dpg.add_table_column(label="Side", width_fixed=True, init_width_or_weight=50)
+                            dpg.add_table_column(label="Quantity", width_fixed=True, init_width_or_weight=60)
+                            dpg.add_table_column(label="ExecPrice", width_fixed=True, init_width_or_weight=70)
+                            dpg.add_table_column(label="RealizedPnL", width_fixed=True, init_width_or_weight=80)
+                            dpg.add_table_column(label="Balance", width_fixed=True, init_width_or_weight=80)
+                            dpg.add_table_column(label="Status")
 
     #every "0.0%"/"0"-tagged text item above(ui_val_tot_returns,
     #ui_val_cagr, etc) is just a static placeholder - render_left_metrics_

@@ -52,6 +52,20 @@ int Broker::createOrder(Order newOrder){
         tempTrade.checkPrice = newOrder.checkPrice;
         tempTrade.filled = false;
         tempTrade.status = "ORDER " + std::to_string(tempID) + " FAILED TO FILL: LACK OF FUNDS OR SHARES OR ATTEMPT TO ORDER 0 SHARES";
+        //currBars[...] auto-vivifies a zero-valued Bar if this ticker was
+        //never seen before(same operator[] behavior checkOrder already
+        //relies on), so date just comes out empty in that edge case rather
+        //than crashing
+        tempTrade.date = currBars[newOrder.ticker].date;
+        //bug fix: commision/currBalance have no default member initializer
+        //on Trade(unlike realizedPnL/limitPrice/date), so leaving them
+        //unset here meant every rejected order's logged Trade carried
+        //whatever garbage happened to already be sitting in that memory -
+        //a rejected order never actually charges a commission, and the
+        //account's balance is untouched by it, so 0.0/checkBalance() are
+        //the genuinely correct values, not just placeholders
+        tempTrade.commision = 0.0;
+        tempTrade.currBalance = user.checkBalance();
         history[tempID] = tempTrade;
     }
     ++tempID;
@@ -71,6 +85,13 @@ void Broker::deleteOrder(int orderID, std::string reason){
     tempTrade.checkPrice = newOrder.checkPrice;
     tempTrade.filled = false;
     tempTrade.status = "ORDER " + std::to_string(orderID) + " CANCELLED : " + reason;
+    tempTrade.date = currBars[newOrder.ticker].date;
+    //bug fix: same as createOrder's failure branch above - a cancelled
+    //order never charges a commission and never touches the balance, so
+    //these are the correct values, not just placeholders for what used to
+    //be uninitialized garbage
+    tempTrade.commision = 0.0;
+    tempTrade.currBalance = user.checkBalance();
     //create trade history entry
     history[orderID] = tempTrade;
     //erase the order
@@ -359,6 +380,12 @@ void Broker::processOrder(int id, Order order){
     tempTrade.side = order.side;
     tempTrade.quantity = order.quantity;
     tempTrade.checkPrice = order.checkPrice;
+    //bug fix: order.limitPrice was already being READ above(to compute
+    //currPrice for a stop_limit fill), but was never actually copied onto
+    //the logged Trade - every trade's limitPrice sat at its struct default
+    //(-1) no matter what type of order it was
+    tempTrade.limitPrice = order.limitPrice;
+    tempTrade.date = currBar.date;
     tempTrade.commision = commisionFee;
 
     //check if position exists on user account or not and fill out order

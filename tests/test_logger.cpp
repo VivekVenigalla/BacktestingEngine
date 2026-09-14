@@ -114,6 +114,9 @@ TEST_CASE("exportCSVTrade writes the trade-history header and one row per trade"
     trade.filled = true;
     trade.status = "FILLED";
     trade.currBalance = 9000.0;
+    trade.realizedPnL = 15.0;
+    trade.limitPrice = -1.0;
+    trade.date = "2024-01-01";
 
     std::unordered_map<long int, Trade> history{{5, trade}};
 
@@ -129,8 +132,8 @@ TEST_CASE("exportCSVTrade writes the trade-history header and one row per trade"
     std::getline(file, header);
     std::getline(file, row);
 
-    REQUIRE(header == "TradeID,TickerID,ExecPrice,Type,Side,Quantity,CheckPrice,Commission,Filled,Status,CurrentBalance");
-    REQUIRE(row == "5,AAPL,101,market,0,10,-1,1,true,FILLED,9000");
+    REQUIRE(header == "TradeID,TickerID,ExecPrice,Type,Side,Quantity,CheckPrice,Commission,Filled,Status,CurrentBalance,RealizedPnL,LimitPrice,Date");
+    REQUIRE(row == "5,AAPL,101,market,0,10,-1,1,true,FILLED,9000,15,-1,2024-01-01");
 }
 
 TEST_CASE("exportJSON writes correctly-computed metrics and trade counts", "[logger]") {

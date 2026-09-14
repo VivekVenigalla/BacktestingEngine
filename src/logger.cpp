@@ -167,7 +167,11 @@ void Logger::exportCSVTrade(fs::path filepath, std::string filename, std::unorde
     double currBalance;
     */
         //only focus on these values shown below, will look into position and bar values later
-        file << "TradeID,TickerID,ExecPrice,Type,Side,Quantity,CheckPrice,Commission,Filled,Status,CurrentBalance\n";
+        //RealizedPnL/LimitPrice/Date appended at the END of the header
+        //(rather than interleaved with the older columns) so any existing
+        //code that expects the original 11-column layout(by position) is
+        //disturbed as little as possible
+        file << "TradeID,TickerID,ExecPrice,Type,Side,Quantity,CheckPrice,Commission,Filled,Status,CurrentBalance,RealizedPnL,LimitPrice,Date\n";
 
         //loop through the vectors and input them one by one
         //for each ticker the csv has another row with the same date
@@ -182,7 +186,10 @@ void Logger::exportCSVTrade(fs::path filepath, std::string filename, std::unorde
             << value.commision << ","
             << (value.filled ? "true" : "false") << "," //conditional operator converts bool to string
             << value.status << ","
-            << value.currBalance << "\n";
+            << value.currBalance << ","
+            << value.realizedPnL << ","
+            << value.limitPrice << ","
+            << value.date << "\n";
         }
 
         file.close();

@@ -74,6 +74,19 @@ int Broker::createOrder(Order newOrder){
 }
 
 void Broker::deleteOrder(int orderID, std::string reason){
+    //bug fix: a strategy(e.g donChannel) may ask to delete an order that
+    //already filled(and was already erased from "orders") during THIS
+    //bar's earlier checkLoop() call - without this guard, orders[orderID]
+    //below would auto-vivify a blank Order for a nonexistent key, and the
+    //bogus "CANCELLED" Trade built from it would overwrite(and destroy)
+    //that order's real, already-filled history record. .count() is the
+    //same "does this key exist" membership-test idiom checkOrder's sell
+    //branch already uses - ==0 means there is genuinely nothing pending
+    //under this id to delete
+    if(orders.count(orderID) == 0){
+        return;
+    }
+
     //access order using the id
     Order newOrder = orders[orderID];
     Trade tempTrade;

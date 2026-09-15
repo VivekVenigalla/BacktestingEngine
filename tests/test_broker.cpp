@@ -269,6 +269,7 @@ TEST_CASE("processOrder fills pending orders via checkLoop with correct execPric
 }
 
 TEST_CASE("stop_limit orders trigger like a plain stop but fill as a limit at limitPrice", "[broker]") {
+    //standard parameters
     Bar bar;
     bar.ticker = "AAPL";
     bar.date = "2024-01-01";

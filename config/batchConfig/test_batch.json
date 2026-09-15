@@ -2,7 +2,7 @@
     "simulation_metadata": {
         "batch_id": "test_batch",
         "notes": "For testing purposes",
-        "created_at": "2026-07-24 12:26:42"
+        "created_at": "2026-09-14 16:04:15"
     },
     "account": [
         {
@@ -41,7 +41,8 @@
                 "TSLA_1D_2024-01-01_2024-12-31"
             ],
             "parameters": {
-                "window": 20
+                "window": 20,
+                "position_size_pct": 0.20000000298023224
             },
             "run_all_by_default": true
         }

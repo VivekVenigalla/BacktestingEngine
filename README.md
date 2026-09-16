@@ -11,7 +11,7 @@ A high-performance algorithmic trading backtesting engine built from scratch in 
 * **CoreTypes:** Defines foundational structures (`Bar`, `Order`, `Position`, `Trade`) optimized for memory and cache management.
 * **CSV Parser:** Parses local CSV files into standard vectors in RAM, utilizing RAII to minimize memory allocations.
 * **Account:** Serves as the primary ledger. It tracks balances and share positions using an unordered map for constant-time lookups while calculating total equity.
-* **Broker:** Manages active orders(market, limit and stop). It utilizes an ID-keyed map to enable constant-time cancellations and handles initial order ingestion from the strategy layer.
+* **Broker:** Manages active orders (market, limit, stop, and stop-limit) and supports short-selling with a cash-collateral guardrail. It utilizes an ID-keyed map to enable constant-time cancellations and handles initial order ingestion from the strategy layer.
 * **Strategy:** Enables runtime polymorphism (via virtual functions and `std::unique_ptr`) so new child strategies can be developed, swapped, and managed interchangeably by the simulation runner.
 * **Performance Metrics:** Computes total return, CAGR, drawdown (current and historical max), Sharpe/Sortino ratios, and trade-level win rate/profit factor for a finished or in-progress simulation.
 * **Logger:** Records a bar-by-bar equity curve during a run and exports it, the trade history, and the computed metrics to CSV/JSON files once a simulation completes.
@@ -35,9 +35,11 @@ A high-performance algorithmic trading backtesting engine built from scratch in 
 │   ├── strategy.hpp           		#Abstract strategy base declarations
 │   ├── createStrat.hpp        		#Strategy creation declarations
 │   ├── performanceEval.hpp    		#Performance metrics declarations
+│   ├── monteCarlo.hpp         		#Monte Carlo resampling declarations (in progress, not yet wired up)
 │   ├── dataFeed.hpp           		#Simulation data feed declarations
 │   ├── simulationRunner.hpp   		#Simulation manager declarations
 │   ├── logger.hpp             		#Simulation metrics management declarations
+│   ├── pathUtils.hpp          		#Data-feed CSV path resolution declarations
 │   ├── projectPaths.hpp.in    		#Template for a build-time-generated header (project root path)
 │   └── strategies/            		#Subfolder for strategy declarations
 ├── src/
@@ -50,9 +52,11 @@ A high-performance algorithmic trading backtesting engine built from scratch in 
 │   ├── plotter.py             		#Graph plotting script
 │   ├── createStrat.cpp        		#Strategy creation script
 │   ├── performanceEval.cpp    		#Performance metrics definitions
+│   ├── monteCarlo.cpp         		#Monte Carlo resampling definitions (in progress, not yet wired up)
 │   ├── dataFeed.cpp           		#Simulation data feed definitions
 │   ├── simulationRunner.cpp   		#Simulation manager definitions
 │   ├── logger.cpp             		#Simulation metrics management definitions
+│   ├── pathUtils.cpp          		#Data-feed CSV path resolution definitions
 │   ├── strategies/            		#Subfolder for strategy definitions
 │   ├── main.cpp               		#Batch-driven simulation entry point
 │   ├── core.py                		#JSON import and GUI integration
@@ -149,7 +153,7 @@ To run a batch simulation, pass the path to a batch config JSON file as the one 
 ```bash
 ./runny ../config/batchConfig/test_batch.json
 ```
-NOTE: running `./runny` with no arguments now prints a usage message and exits instead of running anything. Results are written under `output/<batch_id>/<simulation_id>/` as `dynamicData.csv` (bar-by-bar equity curve), `tradeData.csv` (trade log), and `metricData.json` (computed performance metrics) — not to the `data/` directory, which only ever holds input price data.
+NOTE: running `./runny` with no arguments now prints a usage message and exits instead of running anything. Results are written under `output/<batch_id>/<simulation_id>/` as `dynamicData.csv` (bar-by-bar equity curve), `tradeData.csv` (trade log, including each trade's realized P&L, limit price, and bar date), and `metricData.json` (computed performance metrics) — not to the `data/` directory, which only ever holds input price data.
 
 ### Running Tests
 
@@ -169,4 +173,10 @@ python3 GUI.py
 deactivate
 ```
 
-More information about using the GUI will come out soon!
+The GUI is organized into a few viewports: a landing hub for browsing past batches, a config manager for editing Accounts/Brokers/Data Feeds/Strategies, the node-editor workbench for visually building a batch, and a results dashboard once a batch has run.
+
+The results dashboard's left pane shows Performance Metrics (total return, CAGR), a Risk & Benchmark Metrics section (Sharpe ratio, Sortino ratio, max drawdown, benchmark return), and Trade Statistics (total/successful/unsuccessful trades, win rate, profit factor). The right pane is tabbed: a **Charts** tab with the equity/cash-balance curve (annotated with buy/sell markers at each filled trade) and an underwater drawdown chart, and a **Trade Log** tab listing every order the broker processed, with realized P&L color-coded green/red.
+
+## In Progress
+
+A ~2-month roadmap is underway to build out validation tooling — Monte Carlo simulation, walk-forward analysis, and parameter optimization — followed by a broader library of new strategies. So far, a `MonteCarloSimulator` class (`include/monteCarlo.hpp` / `src/monteCarlo.cpp`) exists with bootstrap resampling, shuffled-order resampling, and percentile summarization, but it isn't wired into the CLI or GUI yet and has no tests — not usable end-to-end today.

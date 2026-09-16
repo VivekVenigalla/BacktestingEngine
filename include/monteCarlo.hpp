@@ -37,6 +37,28 @@ class MonteCarloSimulator{
         //values - this is the classic bootstrap resampling technique
         std::vector<double> bootstrapResample(int numRuns, double initialEquity);
 
+        //permutes(shuffles) the SAME set of real returns into a different
+        //order, without replacement(every return is used exactly once per
+        //run, just reordered) - unlike bootstrapResample, this can never
+        //change the FINAL equity(multiplying the same numbers together in
+        //a different order always gives the same product), so it answers a
+        //different question: "how much could this exact set of wins/losses
+        //have hurt ALONG THE WAY, if they'd landed in a worse sequence?".
+        //two runs with identical final equity can have wildly different max
+        //drawdowns depending purely on order(e.g all the losses landing
+        //back-to-back near the start, vs spread out) - this returns the
+        //worst percentage drawdown seen in each shuffled run
+        std::vector<double> shuffledOrderResample(int numRuns, double initialEquity);
+
+        //sorts a copy of values and returns the p-th percentile(0-100) using
+        //linear interpolation between the two nearest ranks(the same method
+        //numpy's default percentile uses) - more precise than just snapping
+        //to the nearest existing data point when p doesn't land exactly on
+        //an index. static because it needs no Monte Carlo state(returns/
+        //rng) - it's a general-purpose stats helper, usable on either
+        //bootstrapResample's or shuffledOrderResample's output
+        static double percentile(std::vector<double> values, double p);
+
     private:
         std::vector<double> returns;
         //std::mt19937 is a fairly large object(a few KB of internal state) -

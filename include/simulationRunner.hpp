@@ -45,7 +45,11 @@ class SimulationRunner {
 			double initialBalance,
 			double cagrLen,
 			size_t maxBars,
-			std::string batchID);
+			std::string batchID,
+			bool monteCarloEnabled = false,
+			int monteCarloRuns = 1000,
+			bool monteCarloHasSeed = false,
+			unsigned int monteCarloSeed = 0);
 
 		void step();
 		void runSteps(size_t n);
@@ -84,4 +88,11 @@ class SimulationRunner {
 	    size_t currentStep;
 	    size_t totalSteps;
 	    bool isFinished;
+
+	    //passed straight through to Logger::exportData once the sim
+	    //finishes - see exportData's own comment for what each does
+	    bool mcEnabled;
+	    int mcRuns;
+	    bool mcHasSeed;
+	    unsigned int mcSeed;
 };

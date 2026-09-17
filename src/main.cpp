@@ -271,10 +271,29 @@ int main(int argc, char* argv[]) {
         //size_t is a storage method for the size of objects
         size_t totalHistoricalBarsCount = feeds[primaryID].totalBars();
 
+        //optional Monte Carlo block on this sim's batch-json entry -
+        //e.g "monte_carlo": {"enabled": true, "runs": 1000, "seed": 42}.
+        //completely optional: a sim with no such block runs exactly as it
+        //always has, and never gets a monteCarloResults.json output file
+        bool mcEnabled = false;
+        int mcRuns = 1000;
+        bool mcHasSeed = false;
+        unsigned int mcSeed = 0;
+        if(sim.contains("monte_carlo")){
+            json mcConfig = sim["monte_carlo"];
+            mcEnabled = mcConfig.value<bool>("enabled", false);
+            mcRuns = mcConfig.value<int>("runs", 1000);
+            if(mcConfig.contains("seed")){
+                mcHasSeed = true;
+                mcSeed = mcConfig["seed"].get<unsigned int>();
+            }
+        }
+
         //create runner obect
         SimulationRunner runner(
             simID, tempAccount, tempBroker, strategy, tempLogger, calculator,
-            feeds, bars, tempBars, currPrices, feedIDs, initBalance, cagrLength, totalHistoricalBarsCount, batchID
+            feeds, bars, tempBars, currPrices, feedIDs, initBalance, cagrLength, totalHistoricalBarsCount, batchID,
+            mcEnabled, mcRuns, mcHasSeed, mcSeed
         );
 
         //if config says so run the entire simulation

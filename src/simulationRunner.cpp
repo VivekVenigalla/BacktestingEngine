@@ -16,7 +16,11 @@ SimulationRunner::SimulationRunner(const std::string& id,
 									double balance,
 									double length,
 									size_t maxBars,
-									std::string batchID)
+									std::string batchID,
+									bool monteCarloEnabled,
+									int monteCarloRuns,
+									bool monteCarloHasSeed,
+									unsigned int monteCarloSeed)
 
 									: simID(id),
 									tempAccount(accountRef),
@@ -34,7 +38,11 @@ SimulationRunner::SimulationRunner(const std::string& id,
 									currentStep(0),
 									totalSteps(maxBars),
 									isFinished(false),
-									batch(batchID){
+									batch(batchID),
+									mcEnabled(monteCarloEnabled),
+									mcRuns(monteCarloRuns),
+									mcHasSeed(monteCarloHasSeed),
+									mcSeed(monteCarloSeed){
 
 		primaryID = feedIDs[0];
 
@@ -96,7 +104,7 @@ void SimulationRunner::step(){
 	    std::cout << "Simulation [" << simID << "] finished" << "\n";
 	    std::cout << "Account ID: " << tempAccount.id << "\n";
 	    std::cout << "Broker ID: " << tempBroker.id << "\n";
-	    tempLogger.exportData(simID, calculator, tempBroker.returnHistory(), currPrices, initBalance, cagrLength, batch);
+	    tempLogger.exportData(simID, calculator, tempBroker.returnHistory(), currPrices, initBalance, cagrLength, batch, 252.0, mcEnabled, mcRuns, mcHasSeed, mcSeed);
     }
 }
 

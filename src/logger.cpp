@@ -1,6 +1,9 @@
 #include "../include/logger.hpp"
+#include "../include/monteCarlo.hpp"
 #include <fstream>
 #include <iomanip>
+#include <memory>
+#include <algorithm>
 
 #include "nlohmann/json.hpp"
 #include "projectPaths.hpp"
@@ -198,7 +201,84 @@ void Logger::exportCSVTrade(fs::path filepath, std::string filename, std::unorde
     }
 }
 
-void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::string batchID, double periodsPerYear){
+void Logger::exportMonteCarloJSON(fs::path filepath, std::string filename, std::string& simID, double initBalance, int numRuns, bool hasSeed, unsigned int seed){
+    //same primitive exportJSON already uses to turn this run's bar-by-bar
+    //equity curve into a period-return series - Monte Carlo resamples
+    //THOSE returns, it never touches Account/Broker or re-runs the sim
+    std::vector<double> returns = Metrics::returnsFromEquityCurve(fullHistory.totalEquity);
+
+    //MonteCarloSimulator has no default constructor(rng must be seeded up
+    //front), so a plain local variable can't be conditionally reassigned -
+    //a unique_ptr lets both branches below construct it in place
+    std::unique_ptr<MonteCarloSimulator> simulator;
+    if(hasSeed){
+        simulator = std::make_unique<MonteCarloSimulator>(returns, seed);
+    }
+    else{
+        simulator = std::make_unique<MonteCarloSimulator>(returns);
+    }
+
+    std::vector<double> finalEquities = simulator->bootstrapResample(numRuns, initBalance);
+    std::vector<double> maxDrawdowns = simulator->shuffledOrderResample(numRuns, initBalance);
+
+    //10 equal-width buckets spanning the observed final-equity range - a
+    //quick histogram of "how many of the numRuns outcomes landed in each
+    //slice", useful for a GUI plot later without shipping every raw sample
+    const int bucketCount = 10;
+    double minEquity = *std::min_element(finalEquities.begin(), finalEquities.end());
+    double maxEquity = *std::max_element(finalEquities.begin(), finalEquities.end());
+    std::vector<int> bucketCounts(bucketCount, 0);
+    std::vector<double> bucketEdges;
+    double bucketWidth = (maxEquity - minEquity) / static_cast<double>(bucketCount);
+
+    for(int i = 0; i <= bucketCount; i++){
+        bucketEdges.push_back(minEquity + bucketWidth * i);
+    }
+
+    for(double equity : finalEquities){
+        //every run's final equity lands in exactly one bucket - if the
+        //whole range collapses to a single value(bucketWidth == 0, e.g a
+        //strategy that never traded), everything just falls into bucket 0
+        int bucketIndex = 0;
+        if(bucketWidth > 0.0){
+            bucketIndex = static_cast<int>((equity - minEquity) / bucketWidth);
+            //the single run that lands exactly on maxEquity would compute
+            //to bucketCount(one past the last valid index) - clamp it into
+            //the final bucket instead
+            if(bucketIndex >= bucketCount){
+                bucketIndex = bucketCount - 1;
+            }
+        }
+        bucketCounts[bucketIndex]++;
+    }
+
+    std::ofstream file(filepath);
+
+    if(!file){
+        std::cerr<<"File " << filename << " unable to be created. Terminating export..." << std::endl;
+        return;
+    }
+
+    json result;
+    result["simID"] = simID;
+    result["runs"] = numRuns;
+    result["seed"] = hasSeed ? json(seed) : json(nullptr);
+    result["bootstrapFinalEquity"]["p5"] = MonteCarloSimulator::percentile(finalEquities, 5.0);
+    result["bootstrapFinalEquity"]["p50"] = MonteCarloSimulator::percentile(finalEquities, 50.0);
+    result["bootstrapFinalEquity"]["p95"] = MonteCarloSimulator::percentile(finalEquities, 95.0);
+    result["bootstrapFinalEquity"]["histogram"]["bucketEdges"] = bucketEdges;
+    result["bootstrapFinalEquity"]["histogram"]["counts"] = bucketCounts;
+    result["shuffledOrderMaxDrawdown"]["p5"] = MonteCarloSimulator::percentile(maxDrawdowns, 5.0);
+    result["shuffledOrderMaxDrawdown"]["p50"] = MonteCarloSimulator::percentile(maxDrawdowns, 50.0);
+    result["shuffledOrderMaxDrawdown"]["p95"] = MonteCarloSimulator::percentile(maxDrawdowns, 95.0);
+
+    file << result.dump(4);
+    file.close();
+
+    std::cout<<"JSON File " << filename << " created..." << std::endl;
+}
+
+void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_map<long int, Trade>& historyRef, std::unordered_map<std::string, double>& currPrices, double& initBalance, double& cagrLength, std::string batchID, double periodsPerYear, bool monteCarloEnabled, int monteCarloRuns, bool monteCarloHasSeed, unsigned int monteCarloSeed){
 
     //path to the output folder
     //fs::path(...) / "output" builds a path by joining pieces together with
@@ -244,6 +324,15 @@ void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_
 
     fs::path jsonPath = targetFolder / jsonFile;
     exportJSON(jsonPath, jsonFile, calculator, simID, currPrices, initBalance, cagrLength, historyRef, periodsPerYear);
+
+    //optional 4th output file - only written when the sim's batch config
+    //explicitly opted in via a "monte_carlo": {"enabled": true, ...} block.
+    //the three exports above are completely unaffected either way
+    if(monteCarloEnabled){
+        std::string mcFile = "monteCarloResults.json";
+        fs::path mcPath = targetFolder / mcFile;
+        exportMonteCarloJSON(mcPath, mcFile, simID, initBalance, monteCarloRuns, monteCarloHasSeed, monteCarloSeed);
+    }
 
     std::cout << "All files successfully created in directory: " << targetFolder.string() << "\n";
 

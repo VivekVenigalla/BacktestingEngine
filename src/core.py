@@ -366,7 +366,8 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
         "sim_id": sim_id,
         "metrics": {},
         "timeseries": {"dates": [], "balances": [], "equities": [], "drawdowns": [], "prices": []},
-        "trades": []
+        "trades": [],
+        "monte_carlo": {}
     }
 
     if not sim_dir or not os.path.exists(sim_dir):
@@ -445,6 +446,19 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
                     })
         except Exception as e:
             print(f"[Results Error] Failed to parse trade CSV ({trade_path}): {e}")
+
+    #monte carlo results - OPTIONAL, this file only exists when the sim's
+    #batch-json entry had a "monte_carlo": {"enabled": true, ...} block
+    #(see Logger::exportMonteCarloJSON on the c++ side). results["monte_carlo"]
+    #just stays {} when it's missing, same "absent means not-run-yet" idea
+    #as an empty results["metrics"] above
+    mc_path = os.path.join(sim_dir, f"monteCarloResults.json")
+    if os.path.exists(mc_path):
+        try:
+            with open(mc_path, "r") as f:
+                results["monte_carlo"] = json.load(f)
+        except Exception as e:
+            print(f"[Results Error] Failed to read Monte Carlo JSON ({mc_path}): {e}")
 
     return results
 

@@ -2083,6 +2083,84 @@ def render_right_charts_pane(sim_data):
             #rendered in red
             dpg.add_line_series(x_indices, drawdowns, label="Drawdown", parent=dd_y_axis)
 
+#renders the "Monte Carlo" tab - unlike render_left_metrics_pane/
+#render_right_charts_pane above, sim_data["monte_carlo"] can legitimately be
+#{} (most sims never opt into the "monte_carlo" batch-json block at all),
+#so this always has to handle "there's nothing to show" as the normal case,
+#not an error
+def render_monte_carlo_pane(sim_data):
+    mc = sim_data.get("monte_carlo", {})
+
+    if dpg.does_item_exist("mc_render_group"):
+        dpg.delete_item("mc_render_group", children_only=True)
+
+    with dpg.group(parent="mc_render_group"):
+        if not mc:
+            dpg.add_text(
+                "No Monte Carlo data for this simulation - add a \"monte_carlo\": "
+                "{\"enabled\": true, \"runs\": 1000} block to this sim's batch config and re-run it.",
+                color=[150, 150, 150],
+                wrap=500
+            )
+            return
+
+        bootstrap = mc.get("bootstrapFinalEquity", {})
+        shuffled = mc.get("shuffledOrderMaxDrawdown", {})
+
+        dpg.add_text(f"Resampled {mc.get('runs', 0)} times (seed: {mc.get('seed')})", color=[0, 200, 255])
+        dpg.add_spacer(height=8)
+
+        dpg.add_text("Bootstrap Resample - Final Equity", color=[255, 200, 100])
+        dpg.add_text(
+            "Draws the same number of periods AS the real run, WITH replacement, "
+            "and compounds them - answers \"how much did the actual mix of wins/losses matter?\"",
+            color=[150, 150, 150], wrap=500
+        )
+        with dpg.group(horizontal=True):
+            dpg.add_text("p5:")
+            dpg.add_text(f"${bootstrap.get('p5', 0.0):,.2f}", color=[255, 80, 80])
+            dpg.add_spacer(width=15)
+            dpg.add_text("p50:")
+            dpg.add_text(f"${bootstrap.get('p50', 0.0):,.2f}")
+            dpg.add_spacer(width=15)
+            dpg.add_text("p95:")
+            dpg.add_text(f"${bootstrap.get('p95', 0.0):,.2f}", color=[0, 255, 127])
+
+        #histogram: dearpygui's add_bar_series wants one CENTER x-value and
+        #one width("weight") per bar, not raw edges - so each bucket's
+        #[edge[i], edge[i+1]) range gets collapsed to its midpoint here,
+        #with weight set to the bucket's width so bars end up touching
+        #instead of leaving gaps
+        histogram = bootstrap.get("histogram", {})
+        edges = histogram.get("bucketEdges", [])
+        counts = histogram.get("counts", [])
+        if edges and counts and len(edges) == len(counts) + 1:
+            bucket_width = edges[1] - edges[0]
+            midpoints = [(edges[i] + edges[i + 1]) / 2.0 for i in range(len(counts))]
+
+            with dpg.plot(label="Final Equity Distribution", height=220, width=-1):
+                dpg.add_plot_axis(dpg.mvXAxis, label="Final Equity ($)")
+                hist_y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="Runs")
+                dpg.add_bar_series(midpoints, counts, weight=bucket_width * 0.9, parent=hist_y_axis)
+
+        dpg.add_spacer(height=15)
+        dpg.add_text("Shuffled-Order Resample - Max Drawdown", color=[255, 200, 100])
+        dpg.add_text(
+            "Reorders the SAME real returns(no replacement, final equity never changes) - "
+            "answers \"how much worse could the ride have felt, purely from sequence?\"",
+            color=[150, 150, 150], wrap=500
+        )
+        with dpg.group(horizontal=True):
+            dpg.add_text("p5 (worst):")
+            dpg.add_text(f"{shuffled.get('p5', 0.0):.2f}%", color=[255, 80, 80])
+            dpg.add_spacer(width=15)
+            dpg.add_text("p50:")
+            dpg.add_text(f"{shuffled.get('p50', 0.0):.2f}%")
+            dpg.add_spacer(width=15)
+            dpg.add_text("p95 (best):")
+            dpg.add_text(f"{shuffled.get('p95', 0.0):.2f}%", color=[0, 255, 127])
+
+
 def on_strategy_dropdown_changed(sender, app_data, user_data):
     #dropdown for a different strategy
     #by default, assigning to a name inside a function creates a NEW local
@@ -2099,6 +2177,7 @@ def on_strategy_dropdown_changed(sender, app_data, user_data):
         render_left_metrics_pane(sim_data)
         #chart updates here
         render_right_charts_pane(sim_data)
+        render_monte_carlo_pane(sim_data)
 
 
 #builds the whole VIEWPORT 4 window fresh(unlike viewports 1-3, this one
@@ -2279,6 +2358,16 @@ def open_results_dashboard(batch_config):
                             dpg.add_table_column(label="Balance", width_fixed=True, init_width_or_weight=80)
                             dpg.add_table_column(label="Status")
 
+                    with dpg.tab(label="Monte Carlo", tag="tab_monte_carlo"):
+                        dpg.add_text("Trade-Sequence Resampling", color=[255, 200, 100])
+                        dpg.add_separator()
+
+                        #same "static placeholder now, overwritten the
+                        #instant the window finishes building" pattern as
+                        #plot_render_group above
+                        with dpg.group(tag="mc_render_group"):
+                            dpg.add_text("Monte Carlo data will render here...", color=[150, 150, 150])
+
     #every "0.0%"/"0"-tagged text item above(ui_val_tot_returns,
     #ui_val_cagr, etc) is just a static placeholder - render_left_metrics_
     #pane/render_right_charts_pane below immediately overwrite them with
@@ -2288,6 +2377,7 @@ def open_results_dashboard(batch_config):
     first_sim_data = CURRENT_BATCH_RESULTS[ACTIVE_SIM_ID]
     render_left_metrics_pane(first_sim_data)
     render_right_charts_pane(first_sim_data)
+    render_monte_carlo_pane(first_sim_data)
 
 # =============================================================
 # EXECUTION

@@ -35,6 +35,7 @@ add_library(backtest_core STATIC
     src/simulationRunner.cpp
     src/pathUtils.cpp
     src/monteCarlo.cpp
+    src/walkForward.cpp
 )
 target_include_directories(backtest_core PUBLIC include ${CMAKE_BINARY_DIR}/generated)
 # PUBLIC (not PRIVATE): several public headers (createStrat.hpp,

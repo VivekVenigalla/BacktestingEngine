@@ -659,7 +659,24 @@ def spawn_strategy_node(strategy_data, pos = [600,150]):
                 tag=f"run_default_{node_tag}"
             )
 
-
+            #Monte Carlo opt-in - unchecked by default so a normal run
+            #behaves exactly as before. parse_workbench_canvas only attaches
+            #a "monte_carlo" block to this sim's exported json when this box
+            #is checked; main.cpp/Logger never produce monteCarloResults.json
+            #without it, which is what the results dashboard's Monte Carlo
+            #tab needs to show anything besides its "no data" placeholder
+            dpg.add_checkbox(
+                label="Enable Monte Carlo",
+                default_value=False,
+                tag=f"mc_enabled_{node_tag}"
+            )
+            dpg.add_input_int(
+                label="MC Runs",
+                default_value=1000,
+                min_value=1,
+                width=120,
+                tag=f"mc_runs_{node_tag}"
+            )
 
             #dpg.add_separator()
             dpg.add_text("Parameters(Overridable):", color=[200, 200, 200])
@@ -780,6 +797,12 @@ def load_batch_file_to_workbench(file_path):
             dpg.set_value(f"sim_id_{strat_node_tag}", sim.get("id", f"{strat_key}_sim"))
         if dpg.does_item_exist(f"run_default_{strat_node_tag}"):
             dpg.set_value(f"run_default_{strat_node_tag}", sim.get("run_all_by_default", True))
+
+        mc_block = sim.get("monte_carlo", {})
+        if dpg.does_item_exist(f"mc_enabled_{strat_node_tag}"):
+            dpg.set_value(f"mc_enabled_{strat_node_tag}", mc_block.get("enabled", False))
+        if dpg.does_item_exist(f"mc_runs_{strat_node_tag}"):
+            dpg.set_value(f"mc_runs_{strat_node_tag}", mc_block.get("runs", 1000))
 
         for p_name, p_val in sim.get("parameters", {}).items():
             param_tag = f"param_{strat_node_tag}_{p_name}"
@@ -1160,6 +1183,8 @@ def parse_workbench_canvas():
 
         sim_instance_id = dpg.get_value(f"sim_id_{node_id}") or f"{strat_key}_sim"
         run_default = dpg.get_value(f"run_default_{node_id}")
+        mc_enabled = dpg.get_value(f"mc_enabled_{node_id}") if dpg.does_item_exist(f"mc_enabled_{node_id}") else False
+        mc_runs = dpg.get_value(f"mc_runs_{node_id}") if dpg.does_item_exist(f"mc_runs_{node_id}") else 1000
 
         #get overriden parameter values of strategy
         extracted_params = {}
@@ -1187,6 +1212,13 @@ def parse_workbench_canvas():
             "parameters": extracted_params,
             "run_all_by_default": bool(run_default)
         }
+        #only attach the block at all when the checkbox is on - main.cpp
+        #treats a missing "monte_carlo" key as "don't run it", so leaving
+        #it off entirely(rather than exporting enabled:false) keeps an
+        #un-opted-in sim's exported json identical to before this feature
+        #existed
+        if mc_enabled:
+            sim_instance["monte_carlo"] = {"enabled": True, "runs": int(mc_runs)}
         compiled_simulations.append(sim_instance)
 
     #build the full JSON tree

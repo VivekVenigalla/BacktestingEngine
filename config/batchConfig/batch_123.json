@@ -1,100 +1,55 @@
 {
-  "simulation_metadata": {
-    "batch_id": "batch_123",
-    "notes": "test"
-  },
-  "account":[
-    {
-    "id":"basicAccount",
-    "initial_balance":10000,
-    "reset":true
+    "simulation_metadata": {
+        "batch_id": "batch_123",
+        "notes": "No Notes",
+        "created_at": "2026-09-22 10:45:56"
     },
-    {
-    "id":"bollAccount",
-    "initial_balance":10000,
-    "reset":true
-    },
-    {
-    "id":"donAccount",
-    "initial_balance":10000,
-    "reset":true
-    }
-  ],
-  "broker":[
-    {
-    "id":"basicBroker",
-    "commission_rate": 1,
-    "slippage_rate": 0.0005,
-    "account_link":"basicAccount",
-    "reset":true
-    },
-    {
-    "id":"bollBroker",
-    "commission_rate": 1,
-    "slippage_rate": 0.0005,
-    "account_link":"bollAccount",
-    "reset":true
-    },
-    {
-    "id":"donBroker",
-    "commission_rate": 1,
-    "slippage_rate": 0.0005,
-    "account_link":"donAccount",
-    "reset":true
-    }
-  ],
-  "data_feeds": [
-    {
-      "id":"AAPL_1D_2015-1-11_2025-1-11",
-      "ticker": "AAPL",
-      "timeframe": "1D",
-      "cagr_length":10,
-      "start_date":"2015-1-11",
-      "end_date":"2025-1-11",
-      "csv_filepath": "../data/AAPL_1D.csv"
-    }
-  ],
-  "simulations": [
-    {
-      "id":"sma_AAPL_1D_1",
-      "strategy": "sma",
-      "parameters": {
-        "fast_period": 50,
-        "slow_period": 200
-      },
-      "feeds":[
-        "AAPL_1D_2015-1-11_2025-1-11"
-      ],
-      "account_link":"basicAccount",
-      "broker_link":"basicBroker",
-      "run_all_by_default":true
-    },
-    {
-      "id":"boll_AAPL_1D_1",
-      "strategy": "boll",
-      "parameters": {
-        "window" :20
-      },
-      "feeds":[
-        "AAPL_1D_2015-1-11_2025-1-11"
-      ],
-      "account_link":"basicAccount",
-      "broker_link":"basicBroker",
-      "run_all_by_default":true
-    },
-    {
-      "id":"don_AAPL_1D_1",
-      "strategy": "don",
-      "parameters": {
-        "window" :20
-      },
-      "feeds":[
-        "AAPL_1D_2015-1-11_2025-1-11"
-      ],
-      "account_link":"basicAccount",
-      "broker_link":"basicBroker",
-      "run_all_by_default":true
-    }
-
-  ]
+    "account": [
+        {
+            "id": "basicAccount",
+            "initial_balance": 10000,
+            "reset": true
+        }
+    ],
+    "broker": [
+        {
+            "id": "basicBroker",
+            "commission_rate": 1,
+            "slippage_rate": 0.0005,
+            "reset": true,
+            "account_link": "basicAccount"
+        }
+    ],
+    "data_feeds": [
+        {
+            "id": "AAPL_1D_2015-1-11_2025-1-11",
+            "ticker": "AAPL",
+            "timeframe": "1D",
+            "cagr_length": 10,
+            "start_date": "2015-1-11",
+            "end_date": "2025-1-11",
+            "csv_filepath": "../data/AAPL_1D.csv"
+        }
+    ],
+    "simulations": [
+        {
+            "id": "sma_instance_267",
+            "strategy": "sma",
+            "account_link": "basicAccount",
+            "broker_link": "basicBroker",
+            "feeds": [
+                "AAPL_1D_2015-1-11_2025-1-11"
+            ],
+            "parameters": {
+                "fast_period": 10,
+                "slow_period": 50,
+                "position_size_pct": 0.20000000298023224
+            },
+            "run_all_by_default": true,
+            "monte_carlo": {
+                "enabled": true,
+                "runs": 1000
+            }
+        }
+    ]
 }

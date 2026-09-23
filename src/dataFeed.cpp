@@ -33,3 +33,27 @@ bool Data::hasMoreData(){
 void Data::reset(){
     currBar = data.begin();
 }
+
+std::map<std::string, Bar> Data::sliceBars(const std::string& startDate, const std::string& endDate) const{
+    std::map<std::string, Bar> slice;
+
+    //data's keys are YYYY-MM-DD date strings, which sort lexicographically
+    //in the exact same order they sort chronologically - so std::map's own
+    //key ordering(the same ordering lower_bound/upper_bound search over)
+    //already IS date order, no separate date-parsing needed
+    //
+    //lower_bound(startDate): the first entry with a key >= startDate
+    //upper_bound(endDate): the first entry with a key > endDate
+    //[lower_bound(start), upper_bound(end)) is therefore every bar with
+    //startDate <= date <= endDate - inclusive on both ends, matching
+    //WalkForwardWindow's own inSampleStart/inSampleEnd convention
+    auto rangeBegin = data.lower_bound(startDate);
+    auto rangeEnd = data.upper_bound(endDate);
+
+    //std::map's insert(first, last) copies every (key, Bar) pair in that
+    //iterator range straight into slice, in one call, rather than looping
+    //and inserting one at a time by hand
+    slice.insert(rangeBegin, rangeEnd);
+
+    return slice;
+}

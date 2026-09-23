@@ -22,6 +22,14 @@ class Data{
         //bars this feed holds in total)
         size_t totalBars() const {return data.size();}
         void reset();
+        //returns a COPY of every bar whose date falls within
+        //[startDate, endDate], inclusive on both ends - used by walk-forward
+        //analysis to carve one window's worth of price data out of this
+        //feed without disturbing it(currBar/nextBar/reset above are
+        //untouched by this), so the same Data object can still be streamed
+        //bar-by-bar normally afterward, or sliced again for a different
+        //window
+        std::map<std::string, Bar> sliceBars(const std::string& startDate, const std::string& endDate) const;
         std::string ticker;
         std::string ID;
         std::string PATH;

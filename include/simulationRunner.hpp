@@ -56,6 +56,16 @@ class SimulationRunner {
 		void runToDate(const std::string& targetDate);
 		void runAll();
 
+		//silent mode turns OFF the two side effects a normal run has: the
+		//per-bar progress line printed to the console, and the csv/json
+		//files exportData() writes once the run finishes. walk-forward
+		//analysis runs the same strategy dozens of times over short
+		//windows and only wants the resulting numbers back(read straight
+		//from the Logger/Metrics afterward), so without this it would spam
+		//the console and create two output folders per window. defaults to
+		//off, so every existing caller behaves exactly as before
+		void setSilentMode(bool silent) { silentMode = silent;}
+
 		//getters for important states
 		//these three are written as inline one-liners right here in the
 		//header, since each just returns a single field with no other
@@ -88,6 +98,7 @@ class SimulationRunner {
 	    size_t currentStep;
 	    size_t totalSteps;
 	    bool isFinished;
+	    bool silentMode = false;
 
 	    //passed straight through to Logger::exportData once the sim
 	    //finishes - see exportData's own comment for what each does

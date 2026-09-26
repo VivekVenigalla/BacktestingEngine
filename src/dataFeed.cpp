@@ -12,6 +12,11 @@ Data::Data(std::string id, std::string tick, std::string path) : ticker(tick), I
     currBar = data.begin();
 }
 
+Data::Data(std::string id, std::string tick, std::map<std::string, Bar> bars) : ticker(tick), ID(id), PATH(""){
+    data = std::move(bars);
+    currBar = data.begin();
+}
+
 void Data::nextBar(){
     //++currBar moves the iterator forward to the next entry in the map -
     //since std::map is sorted by key(the date string), this steps forward
@@ -56,4 +61,14 @@ std::map<std::string, Bar> Data::sliceBars(const std::string& startDate, const s
     slice.insert(rangeBegin, rangeEnd);
 
     return slice;
+}
+
+std::vector<std::string> Data::allDates() const{
+    std::vector<std::string> dates;
+    dates.reserve(data.size());
+    //std::map iterates in key order, so these come out already sorted
+    for(const auto& [date, bar] : data){
+        dates.push_back(date);
+    }
+    return dates;
 }

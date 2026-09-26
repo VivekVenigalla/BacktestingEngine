@@ -86,9 +86,11 @@ void SimulationRunner::step(){
     currentStep++;
 
     //output the current step and debugging info such as balance and total equity and date
-    std::cout << "Sim[" << simID << "] Progress: " << currentStep << "/" << totalSteps
-              << " | Date: " << tempBars[primaryID].date
-              << " | Balance: " << tempAccount.checkBalance() << "| Total Equity: " << value << "\n";
+    if(!silentMode){
+        std::cout << "Sim[" << simID << "] Progress: " << currentStep << "/" << totalSteps
+                  << " | Date: " << tempBars[primaryID].date
+                  << " | Balance: " << tempAccount.checkBalance() << "| Total Equity: " << value << "\n";
+    }
 
     //log data
     tempLogger.logSnapshot(tempBars[primaryID].date,tempBars,tempAccount.checkBalance(), value, tempAccount.returnPositions(),calculator.drawDown(value));
@@ -100,6 +102,9 @@ void SimulationRunner::step(){
     //if the feed does not have more data than export the data
     if (!feeds[primaryID].hasMoreData()){
 		isFinished = true;
+		//silent mode(see the header) stops here - the caller reads results
+		//straight from the Logger/Metrics instead of from exported files
+		if(silentMode) return;
 		//output account and broker id for debugging and export data
 	    std::cout << "Simulation [" << simID << "] finished" << "\n";
 	    std::cout << "Account ID: " << tempAccount.id << "\n";

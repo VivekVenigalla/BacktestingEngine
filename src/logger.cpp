@@ -306,6 +306,7 @@ void Logger::exportData(std::string& simID, Metrics& calculator, std::unordered_
 
     //create the directory
     fs::create_directories(targetFolder);
+    exportDir = targetFolder;
 
     //export csv data
     std::string csvFile = "dynamicData.csv";

@@ -45,9 +45,16 @@ class Logger{
         //false a fresh, unpredictable seed is drawn each call
         void exportMonteCarloJSON(fs::path filepath, std::string filename, std::string& simID, double initBalance, int numRuns, bool hasSeed, unsigned int seed);
 
+        //folder the most recent exportData() call wrote into(empty before
+        //any export) - exportData picks a unique folder name itself, so
+        //callers that want to drop an extra file beside the others(e.g
+        //walkForwardResults.json) ask here instead of guessing the name
+        fs::path lastExportDir() const { return exportDir; }
+
         void printAllSnapshots();
         void printSnapshot(std::string date);
     private:
         std::unordered_map<std::string, int> lookupMap;
+        fs::path exportDir;
 
 };

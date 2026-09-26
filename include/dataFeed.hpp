@@ -11,6 +11,11 @@ class Data{
     public:
         Data();
         Data(std::string id, std::string tick, std::string path);
+        //builds a feed straight from an already-parsed bar map instead of a
+        //csv path - this is how a sliceBars() result becomes its own
+        //streamable Data, so walk-forward can run a fresh simulation over
+        //just one window's worth of bars
+        Data(std::string id, std::string tick, std::map<std::string, Bar> bars);
         void nextBar();
         Bar& getBar();
         bool hasMoreData();
@@ -30,6 +35,9 @@ class Data{
         //bar-by-bar normally afterward, or sliced again for a different
         //window
         std::map<std::string, Bar> sliceBars(const std::string& startDate, const std::string& endDate) const;
+        //every bar date this feed holds, in ascending order - what
+        //generateWindows() needs as its sortedDates input
+        std::vector<std::string> allDates() const;
         std::string ticker;
         std::string ID;
         std::string PATH;

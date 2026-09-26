@@ -25,6 +25,7 @@
 #include "../include/simulationRunner.hpp"
 #include "../include/logger.hpp"
 #include "../include/pathUtils.hpp"
+#include "../include/walkForward.hpp"
 #include "nlohmann/json.hpp"
 #include "projectPaths.hpp"
 #include <filesystem>
@@ -289,6 +290,22 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        //optional walk-forward block on this sim's batch-json entry -
+        //e.g "walk_forward": {"enabled": true, "in_sample_bars": 252,
+        //"out_sample_bars": 63, "step_bars": 63}. same opt-in idea as
+        //monte_carlo above: a sim without it is completely unaffected
+        bool wfEnabled = false;
+        int wfInSampleBars = 252;
+        int wfOutSampleBars = 63;
+        int wfStepBars = 63;
+        if(sim.contains("walk_forward")){
+            json wfConfig = sim["walk_forward"];
+            wfEnabled = wfConfig.value<bool>("enabled", false);
+            wfInSampleBars = wfConfig.value<int>("in_sample_bars", 252);
+            wfOutSampleBars = wfConfig.value<int>("out_sample_bars", 63);
+            wfStepBars = wfConfig.value<int>("step_bars", 63);
+        }
+
         //create runner obect
         SimulationRunner runner(
             simID, tempAccount, tempBroker, strategy, tempLogger, calculator,
@@ -338,6 +355,34 @@ int main(int argc, char* argv[]) {
 
 
         }
+
+        //walk-forward runs AFTER the normal simulation finishes, so the
+        //regular output folder already exists - the results file is
+        //dropped into that same folder(via Logger::lastExportDir) right
+        //beside metricData.json, the same way monteCarloResults.json is
+        if(wfEnabled){
+            fs::path exportDir = tempLogger.lastExportDir();
+            if(!runner.getIsFinished() || exportDir.empty()){
+                std::cerr << "Walk-forward skipped for [" << simID << "]: the simulation did not run to completion" << std::endl;
+            }
+            else{
+                WalkForwardSetup wfSetup;
+                wfSetup.simID = simID;
+                wfSetup.strategyType = stratType;
+                wfSetup.strategyParams = stratParams;
+                wfSetup.initialBalance = initBalance;
+                wfSetup.commissionRate = brokerConfig["commission_rate"].get<double>();
+                wfSetup.slippageRate = brokerConfig["slippage_rate"].get<double>();
+                wfSetup.cagrLength = cagrLength;
+                wfSetup.feedIDs = feedIDs;
+                wfSetup.allTickers = tempTickers;
+
+                std::cout << "Running walk-forward analysis for [" << simID << "]..." << std::endl;
+                std::vector<WalkForwardResult> wfResults = runWalkForward(wfSetup, feeds, wfInSampleBars, wfOutSampleBars, wfStepBars);
+                exportWalkForwardJSON(exportDir / "walkForwardResults.json", wfSetup, wfInSampleBars, wfOutSampleBars, wfStepBars, wfResults);
+            }
+        }
+
         //reset account and broker
         if(accountReset){
             tempAccount.reset();

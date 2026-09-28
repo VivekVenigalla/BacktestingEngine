@@ -12,6 +12,7 @@ add_executable(unit_tests
     test_strategy.cpp
     test_pathutils.cpp
     test_montecarlo.cpp
+    test_walkforward.cpp
 )
 target_link_libraries(unit_tests PRIVATE backtest_core Catch2::Catch2WithMain)
 

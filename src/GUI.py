@@ -678,6 +678,39 @@ def spawn_strategy_node(strategy_data, pos = [600,150]):
                 tag=f"mc_runs_{node_tag}"
             )
 
+            #Walk-Forward opt-in - same idea as the Monte Carlo checkbox
+            #right above: unchecked by default, and parse_workbench_canvas
+            #only attaches a "walk_forward" block to this sim's exported
+            #json when this box is checked, which is what main.cpp needs to
+            #actually run it and produce walkForwardResults.json for the
+            #results dashboard's Walk-Forward tab to show
+            dpg.add_checkbox(
+                label="Enable Walk-Forward",
+                default_value=False,
+                tag=f"wf_enabled_{node_tag}"
+            )
+            dpg.add_input_int(
+                label="In-Sample Bars",
+                default_value=252,
+                min_value=1,
+                width=120,
+                tag=f"wf_insample_{node_tag}"
+            )
+            dpg.add_input_int(
+                label="Out-Sample Bars",
+                default_value=63,
+                min_value=1,
+                width=120,
+                tag=f"wf_outsample_{node_tag}"
+            )
+            dpg.add_input_int(
+                label="Step Bars",
+                default_value=63,
+                min_value=1,
+                width=120,
+                tag=f"wf_step_{node_tag}"
+            )
+
             #dpg.add_separator()
             dpg.add_text("Parameters(Overridable):", color=[200, 200, 200])
 
@@ -803,6 +836,16 @@ def load_batch_file_to_workbench(file_path):
             dpg.set_value(f"mc_enabled_{strat_node_tag}", mc_block.get("enabled", False))
         if dpg.does_item_exist(f"mc_runs_{strat_node_tag}"):
             dpg.set_value(f"mc_runs_{strat_node_tag}", mc_block.get("runs", 1000))
+
+        wf_block = sim.get("walk_forward", {})
+        if dpg.does_item_exist(f"wf_enabled_{strat_node_tag}"):
+            dpg.set_value(f"wf_enabled_{strat_node_tag}", wf_block.get("enabled", False))
+        if dpg.does_item_exist(f"wf_insample_{strat_node_tag}"):
+            dpg.set_value(f"wf_insample_{strat_node_tag}", wf_block.get("in_sample_bars", 252))
+        if dpg.does_item_exist(f"wf_outsample_{strat_node_tag}"):
+            dpg.set_value(f"wf_outsample_{strat_node_tag}", wf_block.get("out_sample_bars", 63))
+        if dpg.does_item_exist(f"wf_step_{strat_node_tag}"):
+            dpg.set_value(f"wf_step_{strat_node_tag}", wf_block.get("step_bars", 63))
 
         for p_name, p_val in sim.get("parameters", {}).items():
             param_tag = f"param_{strat_node_tag}_{p_name}"
@@ -1185,6 +1228,10 @@ def parse_workbench_canvas():
         run_default = dpg.get_value(f"run_default_{node_id}")
         mc_enabled = dpg.get_value(f"mc_enabled_{node_id}") if dpg.does_item_exist(f"mc_enabled_{node_id}") else False
         mc_runs = dpg.get_value(f"mc_runs_{node_id}") if dpg.does_item_exist(f"mc_runs_{node_id}") else 1000
+        wf_enabled = dpg.get_value(f"wf_enabled_{node_id}") if dpg.does_item_exist(f"wf_enabled_{node_id}") else False
+        wf_insample = dpg.get_value(f"wf_insample_{node_id}") if dpg.does_item_exist(f"wf_insample_{node_id}") else 252
+        wf_outsample = dpg.get_value(f"wf_outsample_{node_id}") if dpg.does_item_exist(f"wf_outsample_{node_id}") else 63
+        wf_step = dpg.get_value(f"wf_step_{node_id}") if dpg.does_item_exist(f"wf_step_{node_id}") else 63
 
         #get overriden parameter values of strategy
         extracted_params = {}
@@ -1219,6 +1266,15 @@ def parse_workbench_canvas():
         #existed
         if mc_enabled:
             sim_instance["monte_carlo"] = {"enabled": True, "runs": int(mc_runs)}
+        #same opt-in-only idea as monte_carlo just above, for main.cpp's
+        #matching "walk_forward" block
+        if wf_enabled:
+            sim_instance["walk_forward"] = {
+                "enabled": True,
+                "in_sample_bars": int(wf_insample),
+                "out_sample_bars": int(wf_outsample),
+                "step_bars": int(wf_step)
+            }
         compiled_simulations.append(sim_instance)
 
     #build the full JSON tree
@@ -2193,6 +2249,87 @@ def render_monte_carlo_pane(sim_data):
             dpg.add_text(f"{shuffled.get('p95', 0.0):.2f}%", color=[0, 255, 127])
 
 
+#renders the "Walk-Forward" tab - same "sim_data["walk_forward"] can
+#legitimately be {}" situation as render_monte_carlo_pane above(most sims
+#never opt into the "walk_forward" batch-json block), so a missing-data
+#placeholder is the normal case here too, not an error
+def render_walk_forward_pane(sim_data):
+    wf = sim_data.get("walk_forward", {})
+
+    if dpg.does_item_exist("wf_render_group"):
+        dpg.delete_item("wf_render_group", children_only=True)
+
+    with dpg.group(parent="wf_render_group"):
+        windows = wf.get("windows", [])
+
+        if not wf or not windows:
+            dpg.add_text(
+                "No Walk-Forward data for this simulation - add a \"walk_forward\": "
+                "{\"enabled\": true, \"in_sample_bars\": 252, \"out_sample_bars\": 63, "
+                "\"step_bars\": 63} block to this sim's batch config and re-run it.",
+                color=[150, 150, 150],
+                wrap=500
+            )
+            return
+
+        dpg.add_text(
+            f"{len(windows)} windows - in-sample: {wf.get('inSampleBars', 0)} bars, "
+            f"out-of-sample: {wf.get('outSampleBars', 0)} bars, step: {wf.get('stepBars', 0)} bars",
+            color=[0, 200, 255]
+        )
+        dpg.add_text(
+            "Same parameters, run once on each window's in-sample stretch and once on the "
+            "out-of-sample stretch right after it - a strategy that only did well in-sample "
+            "is a strategy that overfit that stretch of history, not one with a real edge.",
+            color=[150, 150, 150], wrap=700
+        )
+        dpg.add_spacer(height=8)
+
+        with dpg.table(tag="wf_windows_table", header_row=True, borders_innerH=True, borders_outerH=True,
+                        borders_innerV=True, borders_outerV=True, scrollY=True, height=-1):
+            dpg.add_table_column(label="Window", width_fixed=True, init_width_or_weight=55)
+            dpg.add_table_column(label="In-Sample Range", width_fixed=True, init_width_or_weight=170)
+            dpg.add_table_column(label="Out-Sample Range", width_fixed=True, init_width_or_weight=170)
+            dpg.add_table_column(label="IS Return", width_fixed=True, init_width_or_weight=75)
+            dpg.add_table_column(label="OOS Return", width_fixed=True, init_width_or_weight=80)
+            dpg.add_table_column(label="Degradation", width_fixed=True, init_width_or_weight=90)
+            dpg.add_table_column(label="IS Sharpe", width_fixed=True, init_width_or_weight=70)
+            dpg.add_table_column(label="OOS Sharpe", width_fixed=True, init_width_or_weight=75)
+
+            for entry in windows:
+                in_sample = entry.get("inSample", {})
+                out_sample = entry.get("outSample", {})
+                is_return = in_sample.get("totalReturn", 0.0)
+                oos_return = out_sample.get("totalReturn", 0.0)
+
+                #"% degradation" - how much of the in-sample return the
+                #out-of-sample run failed to hold onto, as a percentage OF
+                #the in-sample return: 0% means OOS matched IS exactly,
+                #100% means OOS gave back the entire in-sample gain, and a
+                #NEGATIVE value means OOS actually did BETTER than IS.
+                #undefined(shown as "N/A") when in-sample return is exactly
+                #0, since there's nothing to measure degradation relative to
+                if abs(is_return) > 1e-9:
+                    degradation = (is_return - oos_return) / abs(is_return) * 100.0
+                    degradation_text = f"{degradation:.1f}%"
+                    #worse OOS -> positive degradation -> red; OOS holding
+                    #up as well or better than IS -> green
+                    degradation_color = [255, 80, 80] if degradation > 0 else [0, 255, 127]
+                else:
+                    degradation_text = "N/A"
+                    degradation_color = [150, 150, 150]
+
+                with dpg.table_row():
+                    dpg.add_text(str(entry.get("window", "")))
+                    dpg.add_text(f"{in_sample.get('start', '')} to {in_sample.get('end', '')}")
+                    dpg.add_text(f"{out_sample.get('start', '')} to {out_sample.get('end', '')}")
+                    dpg.add_text(f"{is_return:.2f}%", color=[0, 255, 127] if is_return >= 0 else [255, 80, 80])
+                    dpg.add_text(f"{oos_return:.2f}%", color=[0, 255, 127] if oos_return >= 0 else [255, 80, 80])
+                    dpg.add_text(degradation_text, color=degradation_color)
+                    dpg.add_text(f"{in_sample.get('sharpeRatio', 0.0):.2f}")
+                    dpg.add_text(f"{out_sample.get('sharpeRatio', 0.0):.2f}")
+
+
 def on_strategy_dropdown_changed(sender, app_data, user_data):
     #dropdown for a different strategy
     #by default, assigning to a name inside a function creates a NEW local
@@ -2210,6 +2347,7 @@ def on_strategy_dropdown_changed(sender, app_data, user_data):
         #chart updates here
         render_right_charts_pane(sim_data)
         render_monte_carlo_pane(sim_data)
+        render_walk_forward_pane(sim_data)
 
 
 #builds the whole VIEWPORT 4 window fresh(unlike viewports 1-3, this one
@@ -2400,6 +2538,15 @@ def open_results_dashboard(batch_config):
                         with dpg.group(tag="mc_render_group"):
                             dpg.add_text("Monte Carlo data will render here...", color=[150, 150, 150])
 
+                    with dpg.tab(label="Walk-Forward", tag="tab_walk_forward"):
+                        dpg.add_text("Rolling In-Sample / Out-of-Sample Windows", color=[255, 200, 100])
+                        dpg.add_separator()
+
+                        #same static-placeholder-overwritten-on-build pattern
+                        #as mc_render_group just above
+                        with dpg.group(tag="wf_render_group"):
+                            dpg.add_text("Walk-Forward data will render here...", color=[150, 150, 150])
+
     #every "0.0%"/"0"-tagged text item above(ui_val_tot_returns,
     #ui_val_cagr, etc) is just a static placeholder - render_left_metrics_
     #pane/render_right_charts_pane below immediately overwrite them with
@@ -2410,6 +2557,7 @@ def open_results_dashboard(batch_config):
     render_left_metrics_pane(first_sim_data)
     render_right_charts_pane(first_sim_data)
     render_monte_carlo_pane(first_sim_data)
+    render_walk_forward_pane(first_sim_data)
 
 # =============================================================
 # EXECUTION

@@ -367,7 +367,8 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
         "metrics": {},
         "timeseries": {"dates": [], "balances": [], "equities": [], "drawdowns": [], "prices": []},
         "trades": [],
-        "monte_carlo": {}
+        "monte_carlo": {},
+        "walk_forward": {}
     }
 
     if not sim_dir or not os.path.exists(sim_dir):
@@ -459,6 +460,18 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
                 results["monte_carlo"] = json.load(f)
         except Exception as e:
             print(f"[Results Error] Failed to read Monte Carlo JSON ({mc_path}): {e}")
+
+    #walk-forward results - OPTIONAL, same idea as monte_carlo above: this
+    #file only exists when the sim's batch-json entry had a "walk_forward":
+    #{"enabled": true, ...} block (see Logger::exportWalkForwardJSON on the
+    #c++ side). results["walk_forward"] stays {} when it's missing
+    wf_path = os.path.join(sim_dir, f"walkForwardResults.json")
+    if os.path.exists(wf_path):
+        try:
+            with open(wf_path, "r") as f:
+                results["walk_forward"] = json.load(f)
+        except Exception as e:
+            print(f"[Results Error] Failed to read Walk-Forward JSON ({wf_path}): {e}")
 
     return results
 

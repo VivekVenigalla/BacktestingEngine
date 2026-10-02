@@ -6,6 +6,8 @@
 #include "performanceEval.hpp"
 #include "simulationRunner.hpp"
 #include "logger.hpp"
+#include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -196,4 +198,149 @@ std::vector<OptimizationResult> runOptimization(
     }
 
     return results;
+}
+
+std::string objectiveName(OptimizationObjective objective){
+    switch(objective){
+        case OptimizationObjective::TotalReturn:
+            return "total_return";
+        case OptimizationObjective::Sharpe:
+            return "sharpe";
+        case OptimizationObjective::CAGR:
+            return "cagr";
+    }
+    throw std::invalid_argument("objectiveName: unknown OptimizationObjective");
+}
+
+bool parseObjective(const std::string& name, OptimizationObjective& objective){
+    if(name == "total_return"){
+        objective = OptimizationObjective::TotalReturn;
+        return true;
+    }
+    if(name == "sharpe"){
+        objective = OptimizationObjective::Sharpe;
+        return true;
+    }
+    if(name == "cagr"){
+        objective = OptimizationObjective::CAGR;
+        return true;
+    }
+    return false;
+}
+
+std::vector<OptimizationResult> rankResults(
+    const std::vector<OptimizationResult>& results,
+    OptimizationObjective objective
+){
+    std::vector<OptimizationResult> ranked = results;
+    //std::stable_sort keeps equal elements in their original relative
+    //order(plain std::sort makes no such promise). the comparator says
+    //"a goes before b" when a's objective value is strictly HIGHER, which
+    //puts the best combo first
+    std::stable_sort(ranked.begin(), ranked.end(),
+        [objective](const OptimizationResult& a, const OptimizationResult& b){
+            return objectiveValue(a.metrics, objective) > objectiveValue(b.metrics, objective);
+        }
+    );
+    return ranked;
+}
+
+//one parameter value as csv cell text: strings go in raw(a json string's
+//dump() would add surrounding quotes), numbers/bools use json's own text,
+//and any cell containing a comma, quote or newline is wrapped in quotes
+//with inner quotes doubled - the standard csv escaping rule
+static std::string csvCell(const nlohmann::json& value){
+    std::string text = value.is_string() ? value.get<std::string>() : value.dump();
+    if(text.find_first_of(",\"\n") == std::string::npos){
+        return text;
+    }
+    std::string escaped = "\"";
+    for(char c : text){
+        if(c == '"'){
+            escaped += "\"\"";
+        }
+        else{
+            escaped += c;
+        }
+    }
+    escaped += "\"";
+    return escaped;
+}
+
+void exportOptimizationCSV(
+    const std::filesystem::path& filepath,
+    const std::vector<std::string>& parameterNames,
+    const std::vector<OptimizationResult>& rankedResults
+){
+    std::ofstream file(filepath);
+
+    if(!file){
+        std::cerr << "File " << filepath.filename().string() << " unable to be created. Terminating export..." << std::endl;
+        return;
+    }
+
+    file << "Rank";
+    for(const std::string& name : parameterNames){
+        file << "," << csvCell(name);
+    }
+    file << ",TotalReturn,CAGR,SharpeRatio,MaxDrawdown,NumTrades\n";
+
+    for(size_t i = 0; i < rankedResults.size(); i++){
+        const OptimizationResult& result = rankedResults[i];
+        file << (i + 1);
+        for(const std::string& name : parameterNames){
+            file << ",";
+            if(result.parameters.contains(name)){
+                file << csvCell(result.parameters[name]);
+            }
+        }
+        file << "," << result.metrics.totalReturn
+             << "," << result.metrics.cagr
+             << "," << result.metrics.sharpeRatio
+             << "," << result.metrics.maxDrawdown
+             << "," << result.metrics.numTrades << "\n";
+    }
+
+    file.close();
+
+    std::cout << "CSV File " << filepath.filename().string() << " created..." << std::endl;
+}
+
+void exportOptimizationSummaryJSON(
+    const std::filesystem::path& filepath,
+    const OptimizerSetup& setup,
+    OptimizationObjective objective,
+    const std::vector<OptimizationResult>& rankedResults
+){
+    std::ofstream file(filepath);
+
+    if(!file){
+        std::cerr << "File " << filepath.filename().string() << " unable to be created. Terminating export..." << std::endl;
+        return;
+    }
+
+    nlohmann::json summary;
+    summary["simID"] = setup.simID;
+    summary["strategy"] = setup.strategyType;
+    summary["objective"] = objectiveName(objective);
+    summary["combinationsTested"] = rankedResults.size();
+
+    if(rankedResults.empty()){
+        summary["best"] = nullptr;
+    }
+    else{
+        const OptimizationResult& best = rankedResults.front();
+        summary["best"]["parameters"] = best.parameters;
+        summary["best"]["objectiveValue"] = objectiveValue(best.metrics, objective);
+        summary["best"]["totalReturn"] = best.metrics.totalReturn;
+        summary["best"]["cagr"] = best.metrics.cagr;
+        summary["best"]["sharpeRatio"] = best.metrics.sharpeRatio;
+        summary["best"]["maxDrawdown"] = best.metrics.maxDrawdown;
+        summary["best"]["numTrades"] = best.metrics.numTrades;
+    }
+
+    file << summary.dump(4);
+    file.close();
+
+    std::cout << "JSON File " << filepath.filename().string() << " created..." << std::endl;
 }

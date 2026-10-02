@@ -26,6 +26,7 @@
 #include "../include/logger.hpp"
 #include "../include/pathUtils.hpp"
 #include "../include/walkForward.hpp"
+#include "../include/optimizer.hpp"
 #include "nlohmann/json.hpp"
 #include "projectPaths.hpp"
 #include <filesystem>
@@ -306,6 +307,25 @@ int main(int argc, char* argv[]) {
             wfStepBars = wfConfig.value<int>("step_bars", 63);
         }
 
+        //optional parameter-optimization block on this sim's batch-json
+        //entry - e.g "optimization": {"enabled": true, "objective": "sharpe",
+        //"grid": {"fast_period": [5, 10, 20], "slow_period": [30, 50]}}.
+        //every combination of the grid's values is run as its own full
+        //simulation, layered on top of this sim's own "parameters"(grid
+        //values win where they overlap). same opt-in idea as monte_carlo
+        //and walk_forward above
+        bool optEnabled = false;
+        std::string optObjectiveText = "sharpe";
+        json optGrid = json::object();
+        if(sim.contains("optimization")){
+            json optConfig = sim["optimization"];
+            optEnabled = optConfig.value<bool>("enabled", false);
+            optObjectiveText = optConfig.value<std::string>("objective", "sharpe");
+            if(optConfig.contains("grid")){
+                optGrid = optConfig["grid"];
+            }
+        }
+
         //create runner obect
         SimulationRunner runner(
             simID, tempAccount, tempBroker, strategy, tempLogger, calculator,
@@ -380,6 +400,66 @@ int main(int argc, char* argv[]) {
                 std::cout << "Running walk-forward analysis for [" << simID << "]..." << std::endl;
                 std::vector<WalkForwardResult> wfResults = runWalkForward(wfSetup, feeds, wfInSampleBars, wfOutSampleBars, wfStepBars);
                 exportWalkForwardJSON(exportDir / "walkForwardResults.json", wfSetup, wfInSampleBars, wfOutSampleBars, wfStepBars, wfResults);
+            }
+        }
+
+        //parameter optimization also runs AFTER the normal simulation, and
+        //drops its two files into that same output folder
+        if(optEnabled){
+            fs::path exportDir = tempLogger.lastExportDir();
+            OptimizationObjective optObjective = OptimizationObjective::Sharpe;
+
+            if(!runner.getIsFinished() || exportDir.empty()){
+                std::cerr << "Optimization skipped for [" << simID << "]: the simulation did not run to completion" << std::endl;
+            }
+            else if(!parseObjective(optObjectiveText, optObjective)){
+                std::cerr << "Optimization skipped for [" << simID << "]: unknown objective \"" << optObjectiveText
+                          << "\" (expected total_return, sharpe or cagr)" << std::endl;
+            }
+            else if(!optGrid.is_object() || optGrid.empty()){
+                std::cerr << "Optimization skipped for [" << simID << "]: \"grid\" must be an object mapping each parameter name to a list of values" << std::endl;
+            }
+            else{
+                ParameterGrid grid;
+                bool gridValid = true;
+                for(auto& [paramName, candidates] : optGrid.items()){
+                    if(!candidates.is_array() || candidates.empty()){
+                        std::cerr << "Optimization skipped for [" << simID << "]: grid parameter \"" << paramName
+                                  << "\" needs a non-empty list of values" << std::endl;
+                        gridValid = false;
+                        break;
+                    }
+                    grid.addParameter(paramName, candidates.get<std::vector<json>>());
+                }
+
+                if(gridValid){
+                    //layer each combo over the sim's own parameters, so
+                    //anything the grid doesn't sweep(e.g position_size_pct)
+                    //keeps the value the sim was configured with
+                    std::vector<json> combos = grid.generateCombinations();
+                    for(json& combo : combos){
+                        json merged = stratParams;
+                        merged.update(combo);
+                        combo = merged;
+                    }
+
+                    OptimizerSetup optSetup;
+                    optSetup.simID = simID;
+                    optSetup.strategyType = stratType;
+                    optSetup.initialBalance = initBalance;
+                    optSetup.commissionRate = brokerConfig["commission_rate"].get<double>();
+                    optSetup.slippageRate = brokerConfig["slippage_rate"].get<double>();
+                    optSetup.cagrLength = cagrLength;
+                    optSetup.feedIDs = feedIDs;
+                    optSetup.allTickers = tempTickers;
+
+                    std::cout << "Running optimization for [" << simID << "]: " << combos.size()
+                              << " combinations, ranked by " << objectiveName(optObjective) << "..." << std::endl;
+                    std::vector<OptimizationResult> optResults = runOptimization(optSetup, feeds, combos);
+                    std::vector<OptimizationResult> ranked = rankResults(optResults, optObjective);
+                    exportOptimizationCSV(exportDir / "optimizationResults.csv", grid.parameterNames(), ranked);
+                    exportOptimizationSummaryJSON(exportDir / "optimizationSummary.json", optSetup, optObjective, ranked);
+                }
             }
         }
 

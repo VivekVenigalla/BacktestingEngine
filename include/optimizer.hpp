@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <filesystem>
 #include "nlohmann/json.hpp"
 #include "dataFeed.hpp"
 
@@ -56,6 +57,12 @@ class ParameterGrid{
         //useful for tests/callers sanity-checking the grid shape before
         //generating
         size_t parameterCount() const { return names.size(); }
+
+        //the parameter names in the order they were added - what the csv
+        //export uses for its parameter columns(a combo json object can't
+        //be relied on for this, since nlohmann::json sorts object keys
+        //alphabetically rather than keeping insertion order)
+        const std::vector<std::string>& parameterNames() const { return names; }
 
     private:
         //names[i] and candidateLists[i] are kept as two parallel
@@ -143,4 +150,53 @@ std::vector<OptimizationResult> runOptimization(
     const OptimizerSetup& setup,
     const std::unordered_map<std::string, Data>& feeds,
     const std::vector<nlohmann::json>& combos
+);
+
+//--- ranking and export ---
+//everything above produces an unordered table of results. the pieces
+//below turn it into something a person can read: sorted best-first by the
+//chosen objective, written out as a csv(every combo) plus a small json
+//naming the winner
+
+//the short text names used in batch configs and output files for each
+//objective: "total_return", "sharpe", "cagr"
+std::string objectiveName(OptimizationObjective objective);
+
+//the reverse of objectiveName(). returns false(leaving `objective`
+//untouched) if `name` isn't one of the three recognized names, so the
+//caller decides how to react to a typo in a config rather than this
+//function silently guessing
+bool parseObjective(const std::string& name, OptimizationObjective& objective);
+
+//returns a copy of `results` sorted best-first: highest objective value
+//first. ties keep their original relative order(a stable sort), so the
+//ranking is deterministic and a combo never jumps ahead of an
+//equally-good earlier one for no reason
+//
+//"best = highest" holds for all three objectives: higher return, higher
+//CAGR, and higher Sharpe are all better
+std::vector<OptimizationResult> rankResults(
+    const std::vector<OptimizationResult>& results,
+    OptimizationObjective objective
+);
+
+//writes optimizationResults.csv at filepath: one row per result, in the
+//order given(pass rankResults()'s output to get best-first), with a Rank
+//column, then one column per name in parameterNames, then every headline
+//metric. a result missing one of the parameter names gets an empty cell
+void exportOptimizationCSV(
+    const std::filesystem::path& filepath,
+    const std::vector<std::string>& parameterNames,
+    const std::vector<OptimizationResult>& rankedResults
+);
+
+//writes optimizationSummary.json at filepath: the objective used, how many
+//combos were tried, and the best combo's parameters and metrics. with no
+//results at all, "best" is written as null rather than omitted, so a
+//reader can tell "nothing was run" apart from "file is out of date"
+void exportOptimizationSummaryJSON(
+    const std::filesystem::path& filepath,
+    const OptimizerSetup& setup,
+    OptimizationObjective objective,
+    const std::vector<OptimizationResult>& rankedResults
 );

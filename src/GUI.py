@@ -619,6 +619,39 @@ def spawn_feed_node(feed_data, pos = [50,300]):
 #strategy(see the createStrat.cpp/strategyBlueprints.json side of this same
 #contract - {"name","type","default"} objects), rather than being hardcoded
 #per strategy type here
+#builds the starting text for a strategy node's "Opt Grid" box: a small grid
+#over the strategy's FIRST int/float parameter, spanning half to one-and-
+#a-half times its default(e.g window default 20 -> {"window": [10, 20, 30]}).
+#just a sensible starting point - the user is expected to edit it
+def default_optimization_grid_text(strategy_data):
+    for param in strategy_data.get("parameters", []):
+        p_type = param.get("type", "float")
+        default = param.get("default", 0)
+        if p_type == "int" and default:
+            values = sorted({max(1, round(default * 0.5)), int(default), round(default * 1.5)})
+            return json.dumps({param["name"]: values})
+        if p_type == "float" and default:
+            values = sorted({round(default * 0.5, 4), float(default), round(default * 1.5, 4)})
+            return json.dumps({param["name"]: values})
+    return "{}"
+
+
+#checks an "Opt Grid" text box's contents: valid json, an object, and every
+#value a non-empty list. returns (grid_dict, None) when fine, or
+#(None, error_message) naming the strategy when not
+def validate_optimization_grid(grid_text, display_name):
+    try:
+        grid = json.loads(grid_text)
+    except ValueError as e:
+        return None, f"Strategy '{display_name}': the Opt Grid is not valid json ({e})."
+    if not isinstance(grid, dict) or not grid:
+        return None, f"Strategy '{display_name}': the Opt Grid must be an object like {{\"window\": [10, 20, 30]}}."
+    for grid_name, grid_values in grid.items():
+        if not isinstance(grid_values, list) or not grid_values:
+            return None, f"Strategy '{display_name}': Opt Grid parameter '{grid_name}' needs a non-empty list of values."
+    return grid, None
+
+
 def spawn_strategy_node(strategy_data, pos = [600,150]):
     node_tag = dpg.generate_uuid()
     in_acct_tag = dpg.generate_uuid()
@@ -709,6 +742,33 @@ def spawn_strategy_node(strategy_data, pos = [600,150]):
                 min_value=1,
                 width=120,
                 tag=f"wf_step_{node_tag}"
+            )
+
+            #Parameter-optimization opt-in - same idea as the two blocks
+            #above. the grid is typed as json text(parameter name -> list of
+            #values to try) rather than built from widgets, which keeps this
+            #node small while still letting any parameter of any strategy be
+            #swept. it starts pre-filled with a small, valid grid over this
+            #strategy's first numeric parameter, so ticking the box and
+            #running works immediately, and editing the text is the only
+            #step needed to sweep something else
+            dpg.add_checkbox(
+                label="Enable Optimization",
+                default_value=False,
+                tag=f"opt_enabled_{node_tag}"
+            )
+            dpg.add_combo(
+                items=["sharpe", "total_return", "cagr"],
+                default_value="sharpe",
+                label="Opt Objective",
+                width=120,
+                tag=f"opt_objective_{node_tag}"
+            )
+            dpg.add_input_text(
+                label="Opt Grid (json)",
+                default_value=default_optimization_grid_text(strategy_data),
+                width=220,
+                tag=f"opt_grid_{node_tag}"
             )
 
             #dpg.add_separator()
@@ -846,6 +906,16 @@ def load_batch_file_to_workbench(file_path):
             dpg.set_value(f"wf_outsample_{strat_node_tag}", wf_block.get("out_sample_bars", 63))
         if dpg.does_item_exist(f"wf_step_{strat_node_tag}"):
             dpg.set_value(f"wf_step_{strat_node_tag}", wf_block.get("step_bars", 63))
+
+        opt_block = sim.get("optimization", {})
+        if dpg.does_item_exist(f"opt_enabled_{strat_node_tag}"):
+            dpg.set_value(f"opt_enabled_{strat_node_tag}", opt_block.get("enabled", False))
+        if dpg.does_item_exist(f"opt_objective_{strat_node_tag}"):
+            dpg.set_value(f"opt_objective_{strat_node_tag}", opt_block.get("objective", "sharpe"))
+        #only overwrite the pre-filled grid text when the loaded file
+        #actually has a grid, otherwise keep the node's own default
+        if opt_block.get("grid") and dpg.does_item_exist(f"opt_grid_{strat_node_tag}"):
+            dpg.set_value(f"opt_grid_{strat_node_tag}", json.dumps(opt_block["grid"]))
 
         for p_name, p_val in sim.get("parameters", {}).items():
             param_tag = f"param_{strat_node_tag}_{p_name}"
@@ -1232,6 +1302,9 @@ def parse_workbench_canvas():
         wf_insample = dpg.get_value(f"wf_insample_{node_id}") if dpg.does_item_exist(f"wf_insample_{node_id}") else 252
         wf_outsample = dpg.get_value(f"wf_outsample_{node_id}") if dpg.does_item_exist(f"wf_outsample_{node_id}") else 63
         wf_step = dpg.get_value(f"wf_step_{node_id}") if dpg.does_item_exist(f"wf_step_{node_id}") else 63
+        opt_enabled = dpg.get_value(f"opt_enabled_{node_id}") if dpg.does_item_exist(f"opt_enabled_{node_id}") else False
+        opt_objective = dpg.get_value(f"opt_objective_{node_id}") if dpg.does_item_exist(f"opt_objective_{node_id}") else "sharpe"
+        opt_grid_text = dpg.get_value(f"opt_grid_{node_id}") if dpg.does_item_exist(f"opt_grid_{node_id}") else "{}"
 
         #get overriden parameter values of strategy
         extracted_params = {}
@@ -1275,6 +1348,15 @@ def parse_workbench_canvas():
                 "out_sample_bars": int(wf_outsample),
                 "step_bars": int(wf_step)
             }
+        #optimization is the one opt-in whose input is free text, so it is
+        #validated here with a message naming the strategy - a typo caught
+        #now is far friendlier than main.cpp skipping the optimization
+        #with only a console message after a whole batch has already run
+        if opt_enabled:
+            opt_grid, opt_error = validate_optimization_grid(opt_grid_text, strat_data.get("display_name"))
+            if opt_error:
+                return None, opt_error
+            sim_instance["optimization"] = {"enabled": True, "objective": opt_objective, "grid": opt_grid}
         compiled_simulations.append(sim_instance)
 
     #build the full JSON tree
@@ -2330,6 +2412,119 @@ def render_walk_forward_pane(sim_data):
                     dpg.add_text(f"{out_sample.get('sharpeRatio', 0.0):.2f}")
 
 
+#the optimization table's rows live here, keyed by the table's tag - the
+#sort callback below needs the real numbers behind each row(the table's own
+#cells only hold formatted text like "25.50%", which can't be sorted
+#numerically). each entry is {"rows": {row_item_id: row_dict},
+#"columns": {column_item_id: csv_column_name}}
+OPTIMIZATION_TABLE_DATA = {}
+
+
+#dearpygui tables don't reorder their own rows when a sortable column
+#header is clicked - they only TELL you what the user asked for(sort_specs,
+#a list of [column_item_id, direction] with direction 1 = ascending and
+#-1 = descending) and leave actually reordering the rows to the callback
+def on_optimization_sort(sender, sort_specs):
+    if sort_specs is None or not sort_specs:
+        return
+    table_data = OPTIMIZATION_TABLE_DATA.get(sender)
+    if table_data is None:
+        return
+
+    column_id, direction = sort_specs[0]
+    column_name = table_data["columns"].get(column_id)
+    if column_name is None:
+        return
+
+    #sorted() needs a plain list to order: each item is (row_item_id, the
+    #value that row has in the clicked column). rows missing the column
+    #sort as 0 rather than crashing the comparison
+    keyed = [(row_id, row.get(column_name, 0)) for row_id, row in table_data["rows"].items()]
+    #numbers and text can't be compared with each other in python, so a
+    #column that holds any text sorts everything as text
+    if any(isinstance(value, str) for _, value in keyed):
+        keyed = [(row_id, str(value)) for row_id, value in keyed]
+    keyed.sort(key=lambda item: item[1], reverse=(direction < 0))
+
+    #reorder_items(table, slot 1 = rows, new order) is what actually moves
+    #the rows on screen
+    dpg.reorder_items(sender, 1, [row_id for row_id, _ in keyed])
+
+
+#renders the "Optimization" tab - sim_data["optimization"] is {} for any
+#sim that never opted into the "optimization" batch-json block, so "no
+#data" is the normal case here too, exactly like the Monte Carlo and
+#Walk-Forward tabs
+def render_optimization_pane(sim_data):
+    opt = sim_data.get("optimization", {})
+
+    if dpg.does_item_exist("opt_render_group"):
+        dpg.delete_item("opt_render_group", children_only=True)
+
+    with dpg.group(parent="opt_render_group"):
+        rows = opt.get("rows", [])
+
+        if not opt or not rows:
+            dpg.add_text(
+                "No optimization data for this simulation - tick \"Enable Optimization\" on its "
+                "strategy node (or add an \"optimization\": {\"enabled\": true, \"objective\": \"sharpe\", "
+                "\"grid\": {...}} block to the sim's batch config) and re-run it.",
+                color=[150, 150, 150],
+                wrap=500
+            )
+            return
+
+        summary = opt.get("summary", {})
+        best = summary.get("best") or {}
+        dpg.add_text(
+            f"{summary.get('combinationsTested', len(rows))} combinations tried, ranked by "
+            f"{summary.get('objective', '?')}",
+            color=[0, 200, 255]
+        )
+        if best:
+            best_params = ", ".join(f"{k}={v}" for k, v in best.get("parameters", {}).items())
+            dpg.add_text(f"Best: {best_params}", color=[0, 255, 127])
+        dpg.add_text(
+            "Every combination of the grid's values was run as its own full simulation over the whole "
+            "dataset. Click a column header to re-sort. A result that is only good for one narrow "
+            "parameter setting, with much worse neighbours, is more likely overfit than a real edge.",
+            color=[150, 150, 150], wrap=700
+        )
+        dpg.add_spacer(height=8)
+
+        #the parameter columns are whatever sits between "Rank" and the
+        #five fixed metric columns - they differ per strategy/grid
+        metric_columns = ["TotalReturn", "CAGR", "SharpeRatio", "MaxDrawdown", "NumTrades"]
+        all_columns = list(rows[0].keys())
+        param_columns = [c for c in all_columns if c != "Rank" and c not in metric_columns]
+        ordered_columns = ["Rank"] + param_columns + [c for c in metric_columns if c in all_columns]
+
+        table_tag = "opt_results_table"
+        if dpg.does_item_exist(table_tag):
+            dpg.delete_item(table_tag)
+        OPTIMIZATION_TABLE_DATA[table_tag] = {"rows": {}, "columns": {}}
+
+        with dpg.table(tag=table_tag, header_row=True, sortable=True, callback=on_optimization_sort,
+                        borders_innerH=True, borders_outerH=True, borders_innerV=True, borders_outerV=True,
+                        scrollY=True, height=-1):
+            for name in ordered_columns:
+                column_id = dpg.add_table_column(label=name)
+                OPTIMIZATION_TABLE_DATA[table_tag]["columns"][column_id] = name
+
+            for row in rows:
+                with dpg.table_row() as row_id:
+                    for name in ordered_columns:
+                        value = row.get(name, "")
+                        if name in ("TotalReturn", "CAGR", "MaxDrawdown"):
+                            color = [0, 255, 127] if value >= 0 else [255, 80, 80]
+                            dpg.add_text(f"{value:.2f}%", color=color)
+                        elif name == "SharpeRatio":
+                            dpg.add_text(f"{value:.2f}")
+                        else:
+                            dpg.add_text(str(value))
+                OPTIMIZATION_TABLE_DATA[table_tag]["rows"][row_id] = row
+
+
 def on_strategy_dropdown_changed(sender, app_data, user_data):
     #dropdown for a different strategy
     #by default, assigning to a name inside a function creates a NEW local
@@ -2348,6 +2543,7 @@ def on_strategy_dropdown_changed(sender, app_data, user_data):
         render_right_charts_pane(sim_data)
         render_monte_carlo_pane(sim_data)
         render_walk_forward_pane(sim_data)
+        render_optimization_pane(sim_data)
 
 
 #builds the whole VIEWPORT 4 window fresh(unlike viewports 1-3, this one
@@ -2547,6 +2743,13 @@ def open_results_dashboard(batch_config):
                         with dpg.group(tag="wf_render_group"):
                             dpg.add_text("Walk-Forward data will render here...", color=[150, 150, 150])
 
+                    with dpg.tab(label="Optimization", tag="tab_optimization"):
+                        dpg.add_text("Parameter Grid Search", color=[255, 200, 100])
+                        dpg.add_separator()
+
+                        with dpg.group(tag="opt_render_group"):
+                            dpg.add_text("Optimization data will render here...", color=[150, 150, 150])
+
     #every "0.0%"/"0"-tagged text item above(ui_val_tot_returns,
     #ui_val_cagr, etc) is just a static placeholder - render_left_metrics_
     #pane/render_right_charts_pane below immediately overwrite them with
@@ -2558,6 +2761,7 @@ def open_results_dashboard(batch_config):
     render_right_charts_pane(first_sim_data)
     render_monte_carlo_pane(first_sim_data)
     render_walk_forward_pane(first_sim_data)
+    render_optimization_pane(first_sim_data)
 
 # =============================================================
 # EXECUTION

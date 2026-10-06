@@ -353,6 +353,22 @@ def get_latest_sim_dir(output_dir, sim_id):
     return candidate_dirs[0][1]
 
 
+#csv cells are all plain text once they're read back from disk - this turns
+#a cell like "25.5" or "10" into the real number it represents(an int when
+#it has no decimal point, a float otherwise) so the optimization table can
+#sort numerically, and leaves anything that isn't a number(e.g a string
+#parameter value like "sma") as the text it already is
+def _to_number_if_numeric(text):
+    try:
+        return int(text)
+    except (TypeError, ValueError):
+        pass
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return text
+
+
 def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
     #given a sim ID and batchID , load files from output/batchid/latestsimsir and parse data
     if output_dir is None:
@@ -368,7 +384,8 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
         "timeseries": {"dates": [], "balances": [], "equities": [], "drawdowns": [], "prices": []},
         "trades": [],
         "monte_carlo": {},
-        "walk_forward": {}
+        "walk_forward": {},
+        "optimization": {}
     }
 
     if not sim_dir or not os.path.exists(sim_dir):
@@ -472,6 +489,33 @@ def load_simulation_results(sim_id, batch_id="test_batch", output_dir=None):
                 results["walk_forward"] = json.load(f)
         except Exception as e:
             print(f"[Results Error] Failed to read Walk-Forward JSON ({wf_path}): {e}")
+
+    #parameter-optimization results - OPTIONAL, same idea again: these two
+    #files only exist when the sim's batch-json entry had an "optimization":
+    #{"enabled": true, ...} block(see exportOptimizationCSV/
+    #exportOptimizationSummaryJSON on the c++ side). results["optimization"]
+    #stays {} when they're missing, and otherwise holds:
+    #  "summary": the parsed optimizationSummary.json(objective, how many
+    #             combos were tried, the best combo)
+    #  "rows":    one dict per optimizationResults.csv row, already ranked
+    #             best-first by the c++ side, with every numeric column
+    #             converted to a real number
+    opt_csv_path = os.path.join(sim_dir, "optimizationResults.csv")
+    opt_summary_path = os.path.join(sim_dir, "optimizationSummary.json")
+    if os.path.exists(opt_csv_path):
+        try:
+            rows = []
+            with open(opt_csv_path, "r") as f:
+                for row in csv.DictReader(f):
+                    rows.append({key: _to_number_if_numeric(value) for key, value in row.items()})
+            results["optimization"]["rows"] = rows
+            results["optimization"]["summary"] = {}
+            if os.path.exists(opt_summary_path):
+                with open(opt_summary_path, "r") as f:
+                    results["optimization"]["summary"] = json.load(f)
+        except Exception as e:
+            print(f"[Results Error] Failed to read optimization results ({opt_csv_path}): {e}")
+            results["optimization"] = {}
 
     return results
 

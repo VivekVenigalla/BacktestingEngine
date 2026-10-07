@@ -274,6 +274,19 @@ TEST_CASE("exportOptimizationCSV writes a header and one ranked row per result",
         REQUIRE(oddLines[1] == "1,\"a,b\",,1,1,1,-10,5");
     }
 
+    SECTION("metrics keep more than 6 significant digits, matching the json outputs") {
+        TempFileGuard guard4{tempFilePath("precision.csv")};
+        std::vector<OptimizationResult> precise = {
+            makeResult({{"window", 20}}, 324.7362123, 15.56117456, 0.9205251234),
+        };
+
+        exportOptimizationCSV(guard4.path, {"window"}, precise);
+
+        std::vector<std::string> preciseLines = readLines(guard4.path);
+        REQUIRE(preciseLines.size() == 2);
+        REQUIRE(preciseLines[1] == "1,20,324.7362123,15.56117456,0.9205251234,-10,5");
+    }
+
     SECTION("no results still writes the header row") {
         TempFileGuard guard3{tempFilePath("empty.csv")};
         exportOptimizationCSV(guard3.path, {"window"}, {});

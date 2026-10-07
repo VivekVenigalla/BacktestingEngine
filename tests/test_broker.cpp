@@ -419,3 +419,28 @@ TEST_CASE("a full short-then-cover cycle realizes P&L correctly through checkLoo
         REQUIRE(acct.positionQuantity("AAPL") == 0);
     }
 }
+
+TEST_CASE("reset clears orders and history and restarts order ids at 1", "[broker]") {
+    Account acct(100000.0);
+    std::unordered_map<std::string, Bar> bars;
+    Broker broker(acct, bars);
+
+    Order order;
+    order.ticker = "AAPL";
+    order.type = "limit";
+    order.side = 0;
+    order.quantity = 1;
+    order.checkPrice = 0.01; //pending, never fills here
+
+    REQUIRE(broker.createOrder(order) == 1);
+    REQUIRE(broker.createOrder(order) == 2);
+    REQUIRE(broker.createOrder(order) == 3);
+    REQUIRE(broker.returnOrders().size() == 3);
+
+    broker.reset();
+
+    REQUIRE(broker.returnOrders().empty());
+    REQUIRE(broker.returnHistory().empty());
+    //a sim reusing this broker numbers its trades from 1 again
+    REQUIRE(broker.createOrder(order) == 1);
+}

@@ -174,6 +174,11 @@ void Account::reset(){
     //inside the map, so modifying value.quantity below actually changes it
     for(auto& [key, value] : positions){
         value.quantity = 0;
+        //average entry price goes back to 0 too, matching a freshly built
+        //account(the constructor opens every position at price 0.0) -
+        //otherwise the previous sim's last entry price kept showing up in
+        //the next sim's early bars, next to a quantity of 0
+        value.average_entry_price = 0.0;
     }
     balance = initial;
 }

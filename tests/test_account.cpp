@@ -110,3 +110,16 @@ TEST_CASE("reset restores the initial balance and zeroes position quantities", "
     REQUIRE(acct.checkBalance() == Catch::Approx(10000.0));
     REQUIRE(acct.positionQuantity("AAPL") == 0);
 }
+
+TEST_CASE("reset also clears each position's average entry price, like a fresh account", "[account]") {
+    Account acct(10000.0, std::vector<std::string>{"AAPL"}, "acct1");
+    REQUIRE(acct.positionAEP("AAPL") == Catch::Approx(0.0));
+
+    acct.buyPositionQuantity("AAPL", 10, 100.0);
+    REQUIRE(acct.positionAEP("AAPL") == Catch::Approx(100.0));
+
+    acct.reset();
+
+    //the previous run's entry price must not leak into the next one
+    REQUIRE(acct.positionAEP("AAPL") == Catch::Approx(0.0));
+}

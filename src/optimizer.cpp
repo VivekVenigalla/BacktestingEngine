@@ -8,6 +8,7 @@
 #include "logger.hpp"
 #include <algorithm>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -278,6 +279,13 @@ void exportOptimizationCSV(
         std::cerr << "File " << filepath.filename().string() << " unable to be created. Terminating export..." << std::endl;
         return;
     }
+
+    //a stream prints doubles with only 6 significant digits by default,
+    //which would round e.g 324.7362 to 324.736 - noticeably less precise
+    //than the same numbers in optimizationSummary.json and metricData.json.
+    //10 digits keeps the csv in agreement with them(and, unlike a fixed
+    //number of decimals, still prints 25.5 as "25.5" rather than padding it)
+    file << std::setprecision(10);
 
     file << "Rank";
     for(const std::string& name : parameterNames){

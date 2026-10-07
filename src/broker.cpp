@@ -550,6 +550,12 @@ void Broker::processOrder(int id, Order order){
 void Broker::reset(){
     orders.clear();
     history.clear();
+    //order ids restart at 1 too, so a sim that reuses a shared broker
+    //numbers its trades exactly as it would have in a run of its own -
+    //without this, the Nth sim in a batch started counting from wherever
+    //the previous sims left off(its trades were identical in every other
+    //way, only the ids differed)
+    tempID = 1;
 }
 
 std::unordered_map<long int, Trade>& Broker::returnHistory(){

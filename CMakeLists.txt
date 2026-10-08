@@ -30,6 +30,7 @@ add_library(backtest_core STATIC
     src/strategies/smaCross.cpp
     src/strategies/bollBand.cpp
     src/strategies/donChannel.cpp
+    src/strategies/rsiReversion.cpp
     src/performanceEval.cpp
     src/logger.cpp
     src/simulationRunner.cpp
